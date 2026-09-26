@@ -39,6 +39,24 @@ public:
         }
     }
 
+    void Wall(olc::vf4d start, olc::vf4d x_step, olc::vf4d w_step, 
+              int x_max, int w_max, olc::Pixel color, bool cw = true)
+    {
+        float mc = 1.0f;  // mulitply color
+        for (int i=0; i<x_max; i++) 
+        {
+            for (int j=0; j<w_max; j++)
+            {
+                if ((i+j) & 1) mc=0.85; else mc=1.0;
+                olc::vf4d offset = start + (x_step * i) + (w_step * j);
+                if (cw)
+                    Face(offset, offset+x_step, offset+x_step+w_step, offset+w_step, color * mc);
+                else
+                    Face(offset, offset+w_step, offset+x_step+w_step, offset+x_step, color * mc);
+            }
+        }
+    }
+
 	// Called once at the start, so create things here
 	bool OnUserCreate() override
 	{
@@ -47,34 +65,21 @@ public:
         int width = 3;
         float hw = (float)width / 2;  // half width
         int length = (int)xe;
-        
-        for (int i=0; i<length; i++)
-        {
-            int j=i+1;
-            float mc = 1.0;  // mulitply color
-            if (i & 1) mc=0.85;
-            float ii = (float)i;
-            float jj = (float)j;
 
-            Face({ii,-hw,-hw}, {ii,hw,-hw},  {jj,hw,-hw}, {jj,-hw,-hw}, olc::Pixel(150, 60, 60) * mc); // -Z south
-            Face({jj,-hw,hw}, {jj,hw,hw},   {ii,hw,hw},  {ii,-hw,hw},  olc::Pixel( 60, 60, 150) * mc); // +Z  north
-            Face({ii,hw,-hw}, {ii,hw,hw},   {jj,hw,hw},  {jj,hw,-hw},  olc::Pixel(220,220, 220) * mc); // +Y  top
+        // Draw Floor -Y Bottom
+        Wall({0,-hw,-hw}, {1, 0, 0, 0}, {0, 0, 1, 0}, length, width, olc::Pixel( 60, 60,  60), true);
+        // Draw Ceiling +Y Top
+        Wall({0, hw,-hw}, {1, 0, 0, 0}, {0, 0, 1, 0}, length, width, olc::Pixel( 220, 220,  220), false);
+        // Draw Left Wall, +Z North
+        Wall({0,-hw, hw}, {1, 0, 0, 0}, {0, 1, 0, 0}, length, width, olc::Pixel( 60, 60,  150), true);
+        // Draw Right Wall, -Z South
+        Wall({0,-hw, -hw}, {1, 0, 0, 0}, {0, 1, 0, 0}, length, width, olc::Pixel( 150, 60,  60), false);
 
+        // Draw End of Tunnel, +X East
+        Wall({xe,-hw, -hw}, {0, 0, 1, 0}, {0, 1, 0, 0}, width, width, olc::Pixel( 60, 150,  60), false);
+        // Draw End of Tunnel, -X West
+        Wall({xw,-hw, -hw}, {0, 0, 1, 0}, {0, 1, 0, 0}, width, width, olc::Pixel( 150, 150,  60), false);
 
-            for (int k=0; k<width; k++) 
-            {
-                float kk = (float)k;
-                if ((i+k) & 1) mc=0.85; else mc=1.0;
-                Face({ii,-hw,-hw+kk}, {jj,-hw,-hw+kk}, {jj,-hw,-hw+kk+1}, {ii,-hw,-hw+kk+1},  olc::Pixel( 60, 60,  60) * mc); // -Y  bottom
-
-            }
-
-        }
-
-        Face({xw,-hw,hw}, {xw,hw,hw},   {xw,hw,-hw}, {xw,-hw,-hw}, olc::Pixel(150,150,  60) ); // -X  west
-        Face({xe,-hw,-hw}, {xe,hw,-hw},  {xe,hw,hw},  {xe,-hw,hw},  olc::Pixel( 60,150,  60) ); // +X  east
-        
-        
         cam.SetPerspective(60.0f * PI / 180.0f, float(ScreenSize().x) / ScreenSize().y, 0.1f, 100.0f);
         cam.SetTarget({4, 0, 0});       // look down the hall
         cam.SetDistance(2.0f);          // from 2 units away
