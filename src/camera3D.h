@@ -62,10 +62,28 @@ namespace olc::utils
 		float GetDistance() const { return m_fDistance; }
 
 		// ---- Shared orientation --------------------------------------------
-		// Yaw: rotation about +Y. 0 looks down +Z (PGE3 "north"). Positive turns
-		// the view to the right. Pitch: positive looks down from above.
-		void SetYaw(float r) { m_fYaw = r; m_fYawTarget = r; m_nYawStep = 0; }
+		// Yaw: rotation about +Y, in radians, always kept in (-PI, PI].
+		//     yaw      facing
+		//     0        +Z
+		//    -PI/2     +X
+		//     PI/2     -X
+		//    +-PI      -Z
+		// Pitch: positive looks down from above.
+		//
+		// SetYaw snaps immediately. SetYawTarget / TurnYaw ease toward the new
+		// yaw in Update(), at SetYawEaseRate's rate.
+		void SetYaw(float r) { m_fYaw = WrapAngle(r); m_fYawTarget = m_fYaw; }
 		float GetYaw() const { return m_fYaw; }
+		// Ease to an absolute yaw, the shortest way round
+		void SetYawTarget(float r) { m_fYawTarget = m_fYaw + WrapAngle(r - m_fYaw); }
+		// Ease by a relative amount, in the direction given (TurnYaw(PI) = turn around)
+		void TurnYaw(float fDelta) { m_fYawTarget += fDelta; }
+		float GetYawTarget() const { return WrapAngle(m_fYawTarget); }
+		// How fast eased turns happen, in 1/seconds. Default 10.
+		// Larger turns faster, smaller turns slower. A turn looks finished
+		// after about 3 / fRate seconds: 10 -> ~0.3s, 5 -> ~0.6s, 20 -> ~0.15s.
+		void SetYawEaseRate(float fRate) { m_fEaseRate = fRate; }
+		bool IsTurning() const { return std::abs(m_fYawTarget - m_fYaw) > 0.001f; }
 		void SetPitch(float r) { m_fPitch = r; }
 		float GetPitch() const { return m_fPitch; }
 		void SetPitchLimits(float lo, float hi) { m_fPitchMin = lo; m_fPitchMax = hi; }
@@ -74,30 +92,34 @@ namespace olc::utils
 		void SetPosition(const olc::vf4d& v) { m_vPos = v; }
 		const olc::vf4d& GetPosition() const { return m_vPos; }
 
-		// ---- Yaw snapping (Orbit) ------------------------------------------
-		// Rotate by whole steps of fStepRadians; Update() eases toward the target.
+		// ---- Yaw steps ------------------------------------------------------
+		// Convenience for grid games: turn in whole steps of fStepRadians.
+		// StepYaw is relative to wherever the yaw currently is heading.
 		void SetYawSnap(float fStepRadians, float fEaseRate = 10.0f)
 		{
 			m_fYawStep = fStepRadians; m_fEaseRate = fEaseRate;
 		}
-		void StepYaw(int nSteps)
-		{
-			m_nYawStep += nSteps;
-			m_fYawTarget = m_nYawStep * m_fYawStep;
-		}
-		int  GetYawStep() const { return m_nYawStep; }
-		bool IsTurning() const { return std::abs(m_fYawTarget - m_fYaw) > 0.001f; }
+		void StepYaw(int nSteps) { TurnYaw(float(nSteps) * m_fYawStep); }
 
 		// ---- Per-frame -------------------------------------------------------
 		void Update(float fElapsedTime)
 		{
 			m_fPitch = std::clamp(m_fPitch, m_fPitchMin, m_fPitchMax);
-			if (m_fYawStep > 0.0f)
+
+			// Ease yaw toward its target
+			if (IsTurning())
 			{
 				float t = std::min(1.0f, m_fEaseRate * fElapsedTime);
 				m_fYaw += (m_fYawTarget - m_fYaw) * t;
 				if (!IsTurning()) m_fYaw = m_fYawTarget;
 			}
+
+			// Keep yaw in (-PI, PI], shifting the target by the same amount so an
+			// in-progress turn continues the same way round
+			float fWrapped = WrapAngle(m_fYaw);
+			m_fYawTarget += fWrapped - m_fYaw;
+			m_fYaw = fWrapped;
+
 			RebuildView();
 		}
 
@@ -121,14 +143,14 @@ namespace olc::utils
 			if (kb.GetKey(olc::Key::SPACE).bHeld) m_vPos.y += s;
 			if (kb.GetKey(olc::Key::CTRL).bHeld)  m_vPos.y -= s;
 			float t = fTurnSpeed * fElapsedTime;
-			if (kb.GetKey(olc::Key::LEFT).bHeld)  { m_fYaw -= t; m_fYawTarget = m_fYaw; }
-			if (kb.GetKey(olc::Key::RIGHT).bHeld) { m_fYaw += t; m_fYawTarget = m_fYaw; }
+			if (kb.GetKey(olc::Key::LEFT).bHeld)  { m_fYaw -= t; m_fYawTarget -= t; }
+			if (kb.GetKey(olc::Key::RIGHT).bHeld) { m_fYaw += t; m_fYawTarget += t; }
 			if (kb.GetKey(olc::Key::UP).bHeld)    m_fPitch -= t;
 			if (kb.GetKey(olc::Key::DOWN).bHeld)  m_fPitch += t;
 		}
 		void MouseLook(const olc::vf2d& vDelta, float fSensitivity = 0.005f)
 		{
-			m_fYaw += vDelta.x * fSensitivity; m_fYawTarget = m_fYaw;
+			m_fYaw += vDelta.x * fSensitivity; m_fYawTarget += vDelta.x * fSensitivity;
 			m_fPitch += vDelta.y * fSensitivity;
 		}
 
@@ -178,6 +200,17 @@ namespace olc::utils
 		const olc::mf4d& GetViewMatrix() const { return m_matView; }
 		const olc::mf4d& GetProjectionMatrix() const { return m_matProj; }
 
+	public:
+		// Wrap an angle into (-PI, PI]
+		static float WrapAngle(float r)
+		{
+			constexpr float PI = std::numbers::pi_v<float>;
+			constexpr float TWO_PI = 2.0f * PI;
+			r = std::fmod(r + PI, TWO_PI);
+			if (r <= 0.0f) r += TWO_PI;
+			return r - PI;
+		}
+
 	private:
 		static olc::vf4d SnapToAxis(const olc::vf4d& v)
 		{
@@ -215,7 +248,7 @@ namespace olc::utils
 		float m_fDistance = 10.0f;
 		float m_fYaw = 0.0f, m_fYawTarget = 0.0f;
 		float m_fPitch = 0.5f, m_fPitchMin = -1.5f, m_fPitchMax = 1.5f;
-		float m_fYawStep = 0.0f, m_fEaseRate = 10.0f;
-		int   m_nYawStep = 0;
+		float m_fYawStep = PI_OVER_2, m_fEaseRate = 10.0f;
+		static constexpr float PI_OVER_2 = std::numbers::pi_v<float> / 2.0f;
 	};
 }

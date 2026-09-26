@@ -78,13 +78,14 @@ public:
         // Draw End of Tunnel, +X East
         Wall({xe,-hw, -hw}, {0, 0, 1, 0}, {0, 1, 0, 0}, width, width, olc::Pixel( 60, 150,  60), false);
         // Draw End of Tunnel, -X West
-        Wall({xw,-hw, -hw}, {0, 0, 1, 0}, {0, 1, 0, 0}, width, width, olc::Pixel( 150, 150,  60), false);
+        Wall({xw,-hw, -hw}, {0, 0, 1, 0}, {0, 1, 0, 0}, width, width, olc::Pixel( 150, 150,  60), true);
 
         cam.SetPerspective(60.0f * PI / 180.0f, float(ScreenSize().x) / ScreenSize().y, 0.1f, 100.0f);
-        cam.SetTarget({4, 0, 0});       // look down the hall
+        cam.SetTarget({xe/2, 0, 0});    // look down the hall from middle
         cam.SetDistance(2.0f);          // from 2 units away
         cam.SetYaw(-PI/2);              // turned so we down X axis
         cam.SetPitch(0.0f);             // level view
+        cam.SetYawEaseRate(5.0f);
 		return true;
 	}
 
@@ -93,6 +94,11 @@ public:
 	{
         // Escape quits the game
         if (keyboard.GetKey(olc::Key::ESCAPE).bPressed) return false;
+
+        if (keyboard.GetKey(olc::Key::Q).bPressed)
+        {
+            cam.SetYawTarget(cam.GetYaw()+PI);
+        }
 
         cam.Update(dt);
         cam.Apply(draw);        // sets view + projection
