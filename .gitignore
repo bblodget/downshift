@@ -5,4 +5,5 @@ compile_commands.json
 dist/
 olcPixelGameEngine3
 cube3d
+docs
 .nvim.lua
