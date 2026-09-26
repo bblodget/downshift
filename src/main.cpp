@@ -44,7 +44,7 @@ public:
 int main()
 {
 	olc::PGEConfig cfg;
-	cfg.vScreenSize = { 480, 270 };
+	cfg.vScreenSize = { 640, 360 };
 	cfg.vPixelSize  = { 2, 2 };
 	cfg.bVSync      = true;
 
