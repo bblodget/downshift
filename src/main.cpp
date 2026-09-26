@@ -97,7 +97,7 @@ public:
 
         if (keyboard.GetKey(olc::Key::Q).bPressed)
         {
-            cam.SetYawTarget(cam.GetYaw()+PI);
+            cam.TurnYaw(PI);
         }
 
         cam.Update(dt);
