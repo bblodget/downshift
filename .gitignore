@@ -3,5 +3,6 @@ build-*/
 compile_commands.json
 .cache/
 dist/
-olcPixelGameEngine3/
+olcPixelGameEngine3
+cube3d
 .nvim.lua
