@@ -42,9 +42,10 @@ public:
 	// Called once at the start, so create things here
 	bool OnUserCreate() override
 	{
-        // float xw = 0.0f;  // x west pos
+        float xw = 0.0f;  // x west pos
         float xe = 30.0f;  // x east pos
-        float hw = 3.0f / 2;  // half width
+        int width = 3;
+        float hw = (float)width / 2;  // half width
         int length = (int)xe;
         
         for (int i=0; i<length; i++)
@@ -54,13 +55,23 @@ public:
             if (i & 1) mc=0.85;
             float ii = (float)i;
             float jj = (float)j;
+
             Face({ii,-hw,-hw}, {ii,hw,-hw},  {jj,hw,-hw}, {jj,-hw,-hw}, olc::Pixel(150, 60, 60) * mc); // -Z south
             Face({jj,-hw,hw}, {jj,hw,hw},   {ii,hw,hw},  {ii,-hw,hw},  olc::Pixel( 60, 60, 150) * mc); // +Z  north
-            Face({ii,-hw,hw}, {ii,hw,hw},   {ii,hw,-hw}, {ii,-hw,-hw}, olc::Pixel(150,150,  60) * mc); // -X  west
             Face({ii,hw,-hw}, {ii,hw,hw},   {jj,hw,hw},  {jj,hw,-hw},  olc::Pixel(220,220, 220) * mc); // +Y  top
-            Face({ii,-hw,-hw}, {jj,-hw,-hw}, {jj,-hw,hw}, {ii,-hw,hw},  olc::Pixel( 60, 60,  60) * mc); // -Y  bottom
+
+
+            for (int k=0; k<width; k++) 
+            {
+                float kk = (float)k;
+                if ((i+k) & 1) mc=0.85; else mc=1.0;
+                Face({ii,-hw,-hw+kk}, {jj,-hw,-hw+kk}, {jj,-hw,-hw+kk+1}, {ii,-hw,-hw+kk+1},  olc::Pixel( 60, 60,  60) * mc); // -Y  bottom
+
+            }
+
         }
 
+        Face({xw,-hw,hw}, {xw,hw,hw},   {xw,hw,-hw}, {xw,-hw,-hw}, olc::Pixel(150,150,  60) ); // -X  west
         Face({xe,-hw,-hw}, {xe,hw,-hw},  {xe,hw,hw},  {xe,-hw,hw},  olc::Pixel( 60,150,  60) ); // +X  east
         
         
