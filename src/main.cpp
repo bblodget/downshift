@@ -17,6 +17,57 @@
 
 constexpr float PI = std::numbers::pi_v<float>;
 
+enum class Gravity
+{
+    NegY = 0,  // floor
+    PosZ = 1,  // left wall
+    PosY = 2,  // ceiling
+    NegZ = 3,  // right wall
+};
+
+struct GravityInfo
+{
+    olc::vf4d direction;
+    const char* name;
+};
+
+const GravityInfo gravityTable[] =
+{
+    {{0.0f, -1.0f,  0.0f, 0.0f}, "floor"},
+    {{0.0f,  0.0f,  1.0f, 0.0f}, "left wall"},
+    {{0.0f,  1.0f,  0.0f, 0.0f}, "ceiling"},
+    {{0.0f,  0.0f, -1.0f, 0.0f}, "right wall"}
+};
+
+olc::vf4d GravityDirection(Gravity gravity)
+{
+    return gravityTable[static_cast<int>(gravity)].direction;
+}
+
+const char* GravityName(Gravity gravity)
+{
+    return gravityTable[static_cast<int>(gravity)].name;
+}
+
+struct Mesh
+{
+    std::vector<olc::vf4d>  pos;  // vertices
+    std::vector<olc::Pixel> col;  // one color per vertex
+};
+
+struct Body
+{
+    olc::vf4d pos       {0.0f, 0.0f, 0.0f, 1.0f};
+    olc::vf4d velocity  {0.0f, 0.0f, 0.0f, 0.0f};
+    olc::vf4d size      {0.8f, 0.8f, 0.8f, 0.0f};  // full size
+    olc::vf4d halfSize  {0.4f, 0.4f, 0.4f, 0.0f};  // half size
+    olc::Pixel tint = olc::Colour::WHITE;
+
+    Gravity gravity = Gravity::NegY;
+    Mesh* mesh = {nullptr};
+};
+
+
 class Downshift : public olc::PixelGameEngine
 {
 public:
@@ -25,21 +76,21 @@ public:
 		sAppName = "Downshift";
 	}
 
-    std::vector<olc::vf4d>  pos;  // 36 vertices, 12 triangles
-    std::vector<olc::Pixel> col;  // one color per vertex
+    Mesh hall;
+    Mesh cube;
     olc::utils::Camera3D    cam;
 
     // Add one face as two triangles.  Corners a,b,c,d go clockwise seen from outside.
-    void Face(olc::vf4d a, olc::vf4d b, olc::vf4d c, olc::vf4d d, olc::Pixel color)
+    void Face(Mesh& mesh, olc::vf4d a, olc::vf4d b, olc::vf4d c, olc::vf4d d, olc::Pixel color)
     {
         for (auto v : { a, b, c,  a, c, d })
         {
-            pos.push_back({v.x, v.y, v.z, 1.0f });
-            col.push_back(color);
+            mesh.pos.push_back({v.x, v.y, v.z, 1.0f });
+            mesh.col.push_back(color);
         }
     }
 
-    void Wall(olc::vf4d start, olc::vf4d x_step, olc::vf4d w_step, 
+    void Wall(Mesh& mesh, olc::vf4d start, olc::vf4d x_step, olc::vf4d w_step, 
               int x_max, int w_max, olc::Pixel color, bool cw = true)
     {
         float mc = 1.0f;  // mulitply color
@@ -47,12 +98,12 @@ public:
         {
             for (int j=0; j<w_max; j++)
             {
-                if ((i+j) & 1) mc=0.85; else mc=1.0;
+                if ((i+j) & 1) mc=0.85f; else mc=1.0f;
                 olc::vf4d offset = start + (x_step * i) + (w_step * j);
                 if (cw)
-                    Face(offset, offset+x_step, offset+x_step+w_step, offset+w_step, color * mc);
+                    Face(mesh, offset, offset+x_step, offset+x_step+w_step, offset+w_step, color * mc);
                 else
-                    Face(offset, offset+w_step, offset+x_step+w_step, offset+x_step, color * mc);
+                    Face(mesh, offset, offset+w_step, offset+x_step+w_step, offset+x_step, color * mc);
             }
         }
     }
@@ -67,18 +118,18 @@ public:
         int length = (int)xe;
 
         // Draw Floor -Y Bottom
-        Wall({0,-hw,-hw}, {1, 0, 0, 0}, {0, 0, 1, 0}, length, width, olc::Pixel( 60, 60,  60), true);
+        Wall(hall, {0,-hw,-hw}, {1, 0, 0, 0}, {0, 0, 1, 0}, length, width, olc::Pixel( 60, 60,  60), true);
         // Draw Ceiling +Y Top
-        Wall({0, hw,-hw}, {1, 0, 0, 0}, {0, 0, 1, 0}, length, width, olc::Pixel( 220, 220,  220), false);
+        Wall(hall, {0, hw,-hw}, {1, 0, 0, 0}, {0, 0, 1, 0}, length, width, olc::Pixel( 220, 220,  220), false);
         // Draw Left Wall, +Z North
-        Wall({0,-hw, hw}, {1, 0, 0, 0}, {0, 1, 0, 0}, length, width, olc::Pixel( 60, 60,  150), true);
+        Wall(hall, {0,-hw, hw}, {1, 0, 0, 0}, {0, 1, 0, 0}, length, width, olc::Pixel( 60, 60,  150), true);
         // Draw Right Wall, -Z South
-        Wall({0,-hw, -hw}, {1, 0, 0, 0}, {0, 1, 0, 0}, length, width, olc::Pixel( 150, 60,  60), false);
+        Wall(hall, {0,-hw, -hw}, {1, 0, 0, 0}, {0, 1, 0, 0}, length, width, olc::Pixel( 150, 60,  60), false);
 
         // Draw End of Tunnel, +X East
-        Wall({xe,-hw, -hw}, {0, 0, 1, 0}, {0, 1, 0, 0}, width, width, olc::Pixel( 60, 150,  60), false);
+        Wall(hall, {xe,-hw, -hw}, {0, 0, 1, 0}, {0, 1, 0, 0}, width, width, olc::Pixel( 60, 150,  60), false);
         // Draw End of Tunnel, -X West
-        Wall({xw,-hw, -hw}, {0, 0, 1, 0}, {0, 1, 0, 0}, width, width, olc::Pixel( 150, 150,  60), true);
+        Wall(hall, {xw,-hw, -hw}, {0, 0, 1, 0}, {0, 1, 0, 0}, width, width, olc::Pixel( 150, 150,  60), true);
 
         cam.SetPerspective(60.0f * PI / 180.0f, float(ScreenSize().x) / ScreenSize().y, 0.1f, 100.0f);
         cam.SetTarget({xe/2, 0, 0});    // look down the hall from middle
@@ -111,7 +162,7 @@ public:
 
         olc::mf4d model;        // identity: cube sits at the origin
         draw.SetModelMatrix(model);
-        draw.Mesh(olc::Structure::List, pos, col);
+        draw.Mesh(olc::Structure::List, hall.pos, hall.col);
 
 		// Successful frame
 		return true;
