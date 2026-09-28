@@ -16,8 +16,10 @@
 #include <numbers>
 #include <sstream>
 #include <iomanip>
+#include <algorithm>
 
 constexpr float PI = std::numbers::pi_v<float>;
+constexpr float gravityStrength = 40.0f;  // World units / second^2
 
 std::string ToString(const olc::vf4d& v)
 {
@@ -76,6 +78,16 @@ struct Body
 
     Gravity gravity = Gravity::NegY;
     const Mesh* mesh = nullptr;
+    bool grounded = true;
+
+    void SetGravity(Gravity g)
+    {
+        if (gravity != g)
+        {
+            grounded = false;
+            gravity = g;
+        }
+    }
 };
 
 // Add one face as two triangles.  Note, we are using clockwise culling.
@@ -148,7 +160,6 @@ struct Hall
     }
 };
 
-
 class Downshift : public olc::PixelGameEngine
 {
 public:
@@ -187,11 +198,55 @@ public:
         Wall(cube, {-hw ,-hw, -hw}, {0, 0, 1, 0}, {0, 1, 0, 0}, lanes, lanes, olc::Colour::WHITE * 0.8f, false);
     }
 
+    void ClampToSurface(Body& body, olc::vf4d dir, float min, float max)
+    {
+        float distance = body.pos.dot(dir);
+        float clamped = std::clamp(distance, min, max);
+        if (distance == clamped)
+            return;
+
+        // Correct only the position component along dir.
+        body.pos += dir * (clamped - distance);
+
+        // Remove only the velocity component along dir.
+        body.velocity += dir * (-body.velocity.dot(dir));
+
+        float gravityAlongDir = GravityDirection(body.gravity).dot(dir);
+
+        if ((distance < min && gravityAlongDir < 0.0f) ||
+            (distance > max && gravityAlongDir > 0.0f))
+        {
+            body.grounded = true;
+        }
+
+    }
+
+    void BodyUpdate (Body& body, float dt)
+    {
+
+        if (!body.grounded)
+        {
+            body.velocity += GravityDirection(body.gravity) * gravityStrength * dt;
+        }
+        body.pos += body.velocity * dt;
+
+        float max_value = hall.length - body.halfSize.x;
+        float min_value = body.halfSize.x;
+        ClampToSurface(body, {1.0f, 0.0f, 0.0f, 0.0f}, min_value, max_value);
+
+        max_value = (hall.HalfWidth()-body.halfSize.y);
+        min_value = -max_value;
+        ClampToSurface(body, {0.0f, 1.0f, 0.0f, 0.0f}, min_value, max_value);
+
+        max_value = (hall.HalfWidth()-body.halfSize.z);
+        min_value = -max_value;
+        ClampToSurface(body, {0.0f, 0.0f, 1.0f, 0.0f}, min_value, max_value);
+    }
+
 
     // Called once at the start, so create things here
     bool OnUserCreate() override
     {
-        
         // Build the Hall
         hall.Build();
 
@@ -212,6 +267,8 @@ public:
     // Called every frame, so update things here
     bool OnUserUpdate(float dt) override
     {
+        dt =std::min(dt, 1.0f / 30.0f);
+
         // Escape quits the game
         if (keyboard.GetKey(olc::Key::ESCAPE).bPressed) return false;
 
@@ -221,10 +278,13 @@ public:
         }
 
 
-        if (keyboard.GetKey(olc::Key::K1).bPressed) player.gravity = Gravity::NegY;
-        if (keyboard.GetKey(olc::Key::K2).bPressed) player.gravity = Gravity::PosZ;
-        if (keyboard.GetKey(olc::Key::K3).bPressed) player.gravity = Gravity::PosY;
-        if (keyboard.GetKey(olc::Key::K4).bPressed) player.gravity = Gravity::NegZ;
+        if (keyboard.GetKey(olc::Key::K1).bPressed) player.SetGravity(Gravity::NegY);
+        if (keyboard.GetKey(olc::Key::K2).bPressed) player.SetGravity(Gravity::PosZ);
+        if (keyboard.GetKey(olc::Key::K3).bPressed) player.SetGravity(Gravity::PosY);
+        if (keyboard.GetKey(olc::Key::K4).bPressed) player.SetGravity(Gravity::NegZ);
+
+        // Update player
+        BodyUpdate(player, dt);
 
         cam.Update(dt);
         cam.Apply(draw);        // sets view + projection
