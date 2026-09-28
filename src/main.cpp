@@ -295,21 +295,28 @@ public:
         draw.SetCullMode(olc::CullMode::ClockWise);
         draw.EnableDepth(true);
 
-        olc::mf4d model;        // identity: hall sits at the origin
-        draw.SetModelMatrix(model);
+        // Rotate towards player gravity down
+        olc::mf4d rot;        // identity: start
+        rot.rotateX(static_cast<int>(player.gravity) * PI/2);    // rotate by 90 degrees
+
+        // Draw Hallway
+        draw.SetModelMatrix(rot);
         draw.Mesh(olc::Structure::List, hall.mesh.pos, hall.mesh.col);
 
+        // Draw Player Cube
         olc::mf4d tr, sc;
         tr.translate(player.pos);
         olc::vf4d s = player.halfSize * 2;
         sc.scale(s.x, s.y, s.z);
-        draw.SetModelMatrix(tr * sc);
+        // Matrices apply right to left
+        // So scale, then translate, then rotate
+        draw.SetModelMatrix(rot * tr * sc);
         draw.Mesh(olc::Structure::List, player.mesh->pos, player.mesh->col, player.tint);
 
-        olc::mf4d gravity_arrow; // identity
-        draw.SetModelMatrix(gravity_arrow);
+        // Draw Gravity Arrow
+        draw.SetModelMatrix(rot);
         draw.EnableDepth(false);
-        draw.Line(player.pos, player.pos + (GravityDirection(player.gravity)*1.25),
+        draw.Line(player.pos, player.pos + (GravityDirection(player.gravity)*1.25f),
                 olc::Colour::TANGERINE, olc::Colour::TANGERINE);
         draw.EnableDepth(true);
 
