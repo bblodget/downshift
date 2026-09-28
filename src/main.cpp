@@ -14,8 +14,19 @@
 #include "olcPixelGameEngine3.h"
 #include "camera3D.h"
 #include <numbers>
+#include <sstream>
+#include <iomanip>
 
 constexpr float PI = std::numbers::pi_v<float>;
+
+std::string ToString(const olc::vf4d& v)
+{
+    std::ostringstream out;
+    out << std::fixed << std::setprecision(2)
+        << "(" << v.x << ", " << v.y << ", "
+        << v.z << ", " << v.w << ")";
+    return out.str();
+}
 
 enum class Gravity
 {
@@ -241,6 +252,11 @@ public:
         draw.Line(player.pos, player.pos + (GravityDirection(player.gravity)*1.25),
                 olc::Colour::TANGERINE, olc::Colour::TANGERINE);
         draw.EnableDepth(true);
+
+        // Draw HUD
+        draw.WorldReset();
+		draw.String({ 2, 2 }, std::string("Gravity: ") + GravityName(player.gravity) 
+                + "\nPosition: " + ToString(player.pos), olc::Colour::YELLOW); 
 
         // Successful frame
         return true;
