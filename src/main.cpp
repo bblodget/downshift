@@ -209,6 +209,12 @@ public:
             cam.TurnYaw(PI);
         }
 
+
+        if (keyboard.GetKey(olc::Key::K1).bPressed) player.gravity = Gravity::NegY;
+        if (keyboard.GetKey(olc::Key::K2).bPressed) player.gravity = Gravity::PosZ;
+        if (keyboard.GetKey(olc::Key::K3).bPressed) player.gravity = Gravity::PosY;
+        if (keyboard.GetKey(olc::Key::K4).bPressed) player.gravity = Gravity::NegZ;
+
         cam.Update(dt);
         cam.Apply(draw);        // sets view + projection
 
@@ -229,6 +235,12 @@ public:
         draw.SetModelMatrix(tr * sc);
         draw.Mesh(olc::Structure::List, player.mesh->pos, player.mesh->col, player.tint);
 
+        olc::mf4d gravity_arrow; // identity
+        draw.SetModelMatrix(gravity_arrow);
+        draw.EnableDepth(false);
+        draw.Line(player.pos, player.pos + (GravityDirection(player.gravity)*1.25),
+                olc::Colour::TANGERINE, olc::Colour::TANGERINE);
+        draw.EnableDepth(true);
 
         // Successful frame
         return true;
