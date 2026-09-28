@@ -1,10 +1,10 @@
 /*
-	Downshift: Escape a 3D maze by changing gravity.
+    Downshift: Escape a 3D maze by changing gravity.
 
-	OLC CodeJam 2026 entry.
+    OLC CodeJam 2026 entry.
 
     Copyright (c) 2026 Brandon Blodget
-	License: GPLv3, see LICENSE.txt for details.
+    License: OLC-3, see LICENSE.md for details.
 */
 
 
@@ -31,6 +31,7 @@ struct GravityInfo
     const char* name;
 };
 
+// The order matches the enum class Gravity
 const GravityInfo gravityTable[] =
 {
     {{0.0f, -1.0f,  0.0f, 0.0f}, "floor"},
@@ -66,7 +67,7 @@ struct Body
     const Mesh* mesh = nullptr;
 };
 
-// Add one face as two triangles.  Corners a,b,c,d go clockwise seen from outside.
+// Add one face as two triangles.  Note, we are using clockwise culling.
 void Face(Mesh& mesh, olc::vf4d a, olc::vf4d b, olc::vf4d c, olc::vf4d d, olc::Pixel color)
 {
     for (auto v : { a, b, c,  a, c, d })
@@ -76,6 +77,13 @@ void Face(Mesh& mesh, olc::vf4d a, olc::vf4d b, olc::vf4d c, olc::vf4d d, olc::P
     }
 }
 
+// cw picks which side of the wall is visible (we cull ClockWise).
+//   true:  visible from the side w_step x x_step points to
+//   false: visible from the opposite side
+// PGE3 coordinate system is Left handed.
+// So if floor drawn with cw=true:
+// Index Finger point +Z (w_step, into the screen) x Middle finger to right +X (x_step)
+// Thumb point +Y, see the floor from above.
 void Wall(Mesh& mesh, olc::vf4d start, olc::vf4d x_step, olc::vf4d w_step, 
           int x_max, int w_max, olc::Pixel color, bool cw = true)
 {
@@ -133,10 +141,10 @@ struct Hall
 class Downshift : public olc::PixelGameEngine
 {
 public:
-	Downshift()
-	{
-		sAppName = "Downshift";
-	}
+    Downshift()
+    {
+        sAppName = "Downshift";
+    }
 
     Hall hall;
     Mesh cube;
@@ -169,14 +177,17 @@ public:
     }
 
 
-	// Called once at the start, so create things here
-	bool OnUserCreate() override
-	{
+    // Called once at the start, so create things here
+    bool OnUserCreate() override
+    {
+        
+        // Build the Hall
+        hall.Build();
+
+        // Build the player
         BuildCubeMesh();
         player.mesh = &cube;
         player.pos = {hall.length/2.0f+2, -hall.HalfWidth() + player.halfSize.y, 0,};
-        
-        hall.Build();
 
         cam.SetPerspective(60.0f * PI / 180.0f, float(ScreenSize().x) / ScreenSize().y, 0.1f, 100.0f);
         cam.SetTarget({hall.length/2.0f, 0, 0});    // look down the hall from middle
@@ -184,12 +195,12 @@ public:
         cam.SetYaw(-PI/2);              // turned so we down X axis
         cam.SetPitch(0.0f);             // level view
         cam.SetYawEaseRate(5.0f);
-		return true;
-	}
+        return true;
+    }
 
-	// Called every frame, so update things here
-	bool OnUserUpdate(float dt) override
-	{
+    // Called every frame, so update things here
+    bool OnUserUpdate(float dt) override
+    {
         // Escape quits the game
         if (keyboard.GetKey(olc::Key::ESCAPE).bPressed) return false;
 
@@ -201,13 +212,13 @@ public:
         cam.Update(dt);
         cam.Apply(draw);        // sets view + projection
 
-		// Clear screen to dark blue
-		draw.Clear(olc::Colour::VERY_DARK_BLUE);
+        // Clear screen to dark blue
+        draw.Clear(olc::Colour::VERY_DARK_BLUE);
 
         draw.SetCullMode(olc::CullMode::ClockWise);
         draw.EnableDepth(true);
 
-        olc::mf4d model;        // identity: cube sits at the origin
+        olc::mf4d model;        // identity: hall sits at the origin
         draw.SetModelMatrix(model);
         draw.Mesh(olc::Structure::List, hall.mesh.pos, hall.mesh.col);
 
@@ -219,22 +230,22 @@ public:
         draw.Mesh(olc::Structure::List, player.mesh->pos, player.mesh->col, player.tint);
 
 
-		// Successful frame
-		return true;
-	}
+        // Successful frame
+        return true;
+    }
 };
 
 
 int main()
 {
-	olc::PGEConfig cfg;
-	cfg.vScreenSize = { 640, 360 };
-	cfg.vPixelSize  = { 2, 2 };
-	cfg.bVSync      = true;
+    olc::PGEConfig cfg;
+    cfg.vScreenSize = { 640, 360 };
+    cfg.vPixelSize  = { 2, 2 };
+    cfg.bVSync      = true;
 
-	Downshift app;
-	if (app.Construct(cfg))
-		app.Start();
-	return 0;
+    Downshift app;
+    if (app.Construct(cfg))
+        app.Start();
+    return 0;
 }
 

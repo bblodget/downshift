@@ -37,3 +37,17 @@ project kind HTML, upload the zip, tick "played in the browser", viewport
 
 Native Linux: build Release, ship the binary with `assets/` beside it. Users
 need libpng16, libX11, libXi, libGL (standard on desktop Linux).
+
+## License and credits
+
+Copyright 2026 Brandon Blodget
+
+This game uses the OLC-3 License.  See [LICENSE.md](LICENSE.md).
+Camera3D was written with AI assistance.
+
+Built with [olcPixelGameEngine3](https://github.com/OneLoneCoder/olcPixelGameEngine3) 
+
+Copyright 2018-2026 OneLoneCoder.com, used under the OLC-3 License.
+
+
+
