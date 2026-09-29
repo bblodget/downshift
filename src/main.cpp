@@ -21,6 +21,7 @@
 constexpr float PI = std::numbers::pi_v<float>;
 constexpr float gravityStrength = 40.0f;  // World units / second^2
 constexpr float easeRate = 10.0f;       // roll ease rate.
+constexpr vf4d cam_offset = {1.0f, 0.5f, 0.0f, 0.0f};
 
 std::string ToString(const olc::vf4d& v)
 {
@@ -265,10 +266,10 @@ public:
         player.pos = {hall.length/2.0f+2, -hall.HalfWidth() + player.halfSize.y, 0,};
 
         cam.SetPerspective(60.0f * PI / 180.0f, float(ScreenSize().x) / ScreenSize().y, 0.1f, 100.0f);
-        cam.SetTarget({hall.length/2.0f, 0, 0});    // look down the hall from middle
-        cam.SetDistance(2.0f);          // from 2 units away
+        cam.SetTarget(player.pos + cam_offset);
+        cam.SetDistance(4.0f);          // distance in units
         cam.SetYaw(-PI/2);              // turned so we down X axis
-        cam.SetPitch(0.0f);             // level view
+        cam.SetPitch(PI/12);            // Look down at 15 degrees.
         cam.SetYawEaseRate(5.0f);
         return true;
     }
@@ -299,6 +300,7 @@ public:
         // Update player
         BodyUpdate(player, dt);
 
+        // Update Hall
         // Rotate towards player gravity down
         olc::mf4d rot;        // identity: start
         if (IsRolling())
@@ -307,7 +309,14 @@ public:
             roll += utils::Camera3D::WrapAngle(RollTarget() - roll) * t;
             if (!IsRolling()) roll = RollTarget();
         }
+        // Rotate towards player gravity
+        rot.rotateX(roll);
 
+        // Camera Update
+        // roll cam target with the room and add offset
+        olc::vf4d cam_target = (rot * player.pos) + cam_offset;
+
+        cam.SetTarget(cam_target);
         cam.Update(dt);
         cam.Apply(draw);        // sets view + projection
 
@@ -318,9 +327,6 @@ public:
 
         draw.SetCullMode(olc::CullMode::ClockWise);
         draw.EnableDepth(true);
-
-        // Rotate towards player gravity
-        rot.rotateX(roll);
 
         // Draw Hallway
         draw.SetModelMatrix(rot);
