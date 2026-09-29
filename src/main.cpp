@@ -21,7 +21,9 @@
 constexpr float PI = std::numbers::pi_v<float>;
 constexpr float gravityStrength = 40.0f;  // World units / second^2
 constexpr float easeRate = 10.0f;       // roll ease rate.
-constexpr vf4d cam_offset = {1.0f, 0.5f, 0.0f, 0.0f};
+constexpr float moveSpeed = 5.0f;
+constexpr float camAhead = 1.0f;    // cam target ahead of the player
+constexpr float camHeight = 0.5f;   // cam target above the player
 
 std::string ToString(const olc::vf4d& v)
 {
@@ -175,6 +177,7 @@ public:
     olc::utils::Camera3D    cam;
     Body player;
     float roll = 0.0f;
+    float facing = 1.0f;
 
     void BuildCubeMesh()
     {
@@ -253,6 +256,17 @@ public:
 
     bool IsRolling() const { return std::abs(utils::Camera3D::WrapAngle(RollTarget() - roll)) > 0.01f; }
 
+    olc::vf4d Forward () const
+    {
+        return {facing, 0.0f, 0.0f, 0.0f};
+    }
+
+    void SetCameraTarget(const olc::mf4d& rot)
+    {
+        olc::vf4d screenUp = {0.0f, 1.0f, 0.0f, 0.0f};
+        olc::vf4d cam_target = (rot * player.pos) + (Forward() * camAhead) + (screenUp * camHeight);
+        cam.SetTarget(cam_target);
+    }
 
     // Called once at the start, so create things here
     bool OnUserCreate() override
@@ -266,13 +280,14 @@ public:
         player.pos = {hall.length/2.0f+2, -hall.HalfWidth() + player.halfSize.y, 0,};
 
         cam.SetPerspective(60.0f * PI / 180.0f, float(ScreenSize().x) / ScreenSize().y, 0.1f, 100.0f);
-        cam.SetTarget(player.pos + cam_offset);
+        SetCameraTarget(olc::mf4d());
         cam.SetDistance(4.0f);          // distance in units
         cam.SetYaw(-PI/2);              // turned so we down X axis
         cam.SetPitch(PI/12);            // Look down at 15 degrees.
         cam.SetYawEaseRate(5.0f);
         return true;
     }
+
 
     // Called every frame, so update things here
     bool OnUserUpdate(float dt) override
@@ -287,6 +302,7 @@ public:
         if (keyboard.GetKey(olc::Key::Q).bPressed)
         {
             cam.TurnYaw(PI);
+            facing = -facing;
         }
 
 
@@ -294,6 +310,29 @@ public:
         if (keyboard.GetKey(olc::Key::K2).bPressed) player.SetGravity(Gravity::PosZ);
         if (keyboard.GetKey(olc::Key::K3).bPressed) player.SetGravity(Gravity::PosY);
         if (keyboard.GetKey(olc::Key::K4).bPressed) player.SetGravity(Gravity::NegZ);
+
+        olc::vf4d forward = Forward();
+
+        // Remove the velocity component along forward direction
+        player.velocity += forward * (-player.velocity.dot(forward));
+        if (keyboard.GetKey(olc::Key::W).bHeld) player.velocity += forward * moveSpeed;
+        if (keyboard.GetKey(olc::Key::S).bHeld) player.velocity += forward * -moveSpeed;
+
+        olc::vf4d surfaceUp = -GravityDirection(player.gravity);
+        olc::vf4d right_dir = surfaceUp.cross(forward);
+
+        // Remove only the velocity component along right_dir.
+        player.velocity += right_dir * (-player.velocity.dot(right_dir));
+
+        if (keyboard.GetKey(olc::Key::A).bHeld)
+        {
+            player.velocity += right_dir * -moveSpeed;
+        }
+        if (keyboard.GetKey(olc::Key::D).bHeld)
+        {
+            player.velocity += right_dir * moveSpeed;
+        }
+
 
         /************** Game State Update ****************/
 
@@ -314,9 +353,7 @@ public:
 
         // Camera Update
         // roll cam target with the room and add offset
-        olc::vf4d cam_target = (rot * player.pos) + cam_offset;
-
-        cam.SetTarget(cam_target);
+        SetCameraTarget(rot);
         cam.Update(dt);
         cam.Apply(draw);        // sets view + projection
 
