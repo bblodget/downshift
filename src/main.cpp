@@ -20,6 +20,7 @@
 
 constexpr float PI = std::numbers::pi_v<float>;
 constexpr float gravityStrength = 40.0f;  // World units / second^2
+constexpr float easeRate = 10.0f;       // roll ease rate.
 
 std::string ToString(const olc::vf4d& v)
 {
@@ -172,6 +173,7 @@ public:
     Mesh cube;
     olc::utils::Camera3D    cam;
     Body player;
+    float roll = 0.0f;
 
     void BuildCubeMesh()
     {
@@ -243,6 +245,13 @@ public:
         ClampToSurface(body, {0.0f, 0.0f, 1.0f, 0.0f}, min_value, max_value);
     }
 
+    float RollTarget() const
+    {
+        return static_cast<int>(player.gravity) * PI/2;
+    }
+
+    bool IsRolling() const { return std::abs(utils::Camera3D::WrapAngle(RollTarget() - roll)) > 0.01f; }
+
 
     // Called once at the start, so create things here
     bool OnUserCreate() override
@@ -269,6 +278,8 @@ public:
     {
         dt =std::min(dt, 1.0f / 30.0f);
 
+        /************** Check Controls ****************/
+
         // Escape quits the game
         if (keyboard.GetKey(olc::Key::ESCAPE).bPressed) return false;
 
@@ -283,11 +294,24 @@ public:
         if (keyboard.GetKey(olc::Key::K3).bPressed) player.SetGravity(Gravity::PosY);
         if (keyboard.GetKey(olc::Key::K4).bPressed) player.SetGravity(Gravity::NegZ);
 
+        /************** Game State Update ****************/
+
         // Update player
         BodyUpdate(player, dt);
 
+        // Rotate towards player gravity down
+        olc::mf4d rot;        // identity: start
+        if (IsRolling())
+        {
+            float t = std::min(1.0f, easeRate * dt);
+            roll += utils::Camera3D::WrapAngle(RollTarget() - roll) * t;
+            if (!IsRolling()) roll = RollTarget();
+        }
+
         cam.Update(dt);
         cam.Apply(draw);        // sets view + projection
+
+        /************** Drawing ****************/
 
         // Clear screen to dark blue
         draw.Clear(olc::Colour::VERY_DARK_BLUE);
@@ -295,9 +319,8 @@ public:
         draw.SetCullMode(olc::CullMode::ClockWise);
         draw.EnableDepth(true);
 
-        // Rotate towards player gravity down
-        olc::mf4d rot;        // identity: start
-        rot.rotateX(static_cast<int>(player.gravity) * PI/2);    // rotate by 90 degrees
+        // Rotate towards player gravity
+        rot.rotateX(roll);
 
         // Draw Hallway
         draw.SetModelMatrix(rot);
