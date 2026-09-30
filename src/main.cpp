@@ -172,7 +172,7 @@ void Wall(Mesh& mesh, olc::vf4d start, olc::vf4d x_step, olc::vf4d w_step,
 struct Hall
 {
     int length = 30;
-    int lanes = 3;
+    int lanes = 4;
     Mesh mesh;
     float HalfWidth() const
     {
@@ -308,8 +308,19 @@ public:
 
     void SetCameraTarget(const olc::mf4d& rot)
     {
-        olc::vf4d screenUp = {0.0f, 1.0f, 0.0f, 0.0f};
-        olc::vf4d cam_target = (rot * player.pos) + (Forward() * camAhead) + (screenUp * camHeight);
+        const olc::vf4d screenUp = {0.0f, 1.0f, 0.0f, 0.0f};
+        const olc::vf4d forward = Forward();
+
+        olc::vf4d cam_target = (rot * player.pos) + (forward * camAhead) + (screenUp * camHeight);
+
+        const float margin = 0.1f;
+        const float offsetX =
+            forward.x * cam.GetDistance() * std::cos(cam.GetPitch());
+
+        float eyeX = cam_target.x - offsetX;
+        eyeX = std::clamp(eyeX, margin, float(hall.length) - margin);
+
+        cam_target.x = eyeX + offsetX;
         cam.SetTarget(cam_target);
     }
 
@@ -361,11 +372,11 @@ public:
         player.mesh = &cube;
         player.pos = {hall.length/2.0f+2, -hall.HalfWidth() + player.halfSize.y, 0,};
 
-        cam.SetPerspective(60.0f * PI / 180.0f, float(ScreenSize().x) / ScreenSize().y, 0.1f, 100.0f);
+        cam.SetPerspective(75.0f * PI / 180.0f, float(ScreenSize().x) / ScreenSize().y, 0.1f, 100.0f);
         SetCameraTarget(olc::mf4d());
-        cam.SetDistance(4.0f);          // distance in units
+        cam.SetDistance(3.0f);          // distance in units
         cam.SetYaw(-PI/2);              // turned so we down X axis
-        cam.SetPitch(PI/12);            // Look down at 15 degrees.
+        cam.SetPitch(PI/18);            // Look down at 10 degrees.
         cam.SetYawEaseRate(5.0f);
         return true;
     }
