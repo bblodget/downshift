@@ -112,9 +112,9 @@ struct Body
         gravity = g;
     }
 
-    void Lash(Gravity gravity, olc::vf4d hit_point)
+    void Lash(Gravity wall, olc::vf4d hit_point)
     {
-        SetGravity(gravity);
+        SetGravity(wall);
         pull_dir = (hit_point - pos).norm();
         pull_dir.w = 0.0f;
         motion = Motion::Lashing;
@@ -125,9 +125,9 @@ struct Body
         motion = Motion::Grounded;
     }
 
-    void Fall(Gravity gravity)
+    void Fall(Gravity wall)
     {
-        SetGravity(gravity);
+        SetGravity(wall);
         motion = Motion::Falling;
     }
 
