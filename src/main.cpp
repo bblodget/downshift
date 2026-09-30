@@ -24,7 +24,7 @@ constexpr float easeRate = 10.0f;       // roll ease rate.
 constexpr float moveSpeed = 5.0f;
 constexpr float camAhead = 1.0f;    // cam target ahead of the player
 constexpr float camHeight = 0.5f;   // cam target above the player
-constexpr float maxLashDist = 10.0f;
+constexpr float maxLashDist = 20.0f;
 
 std::string ToString(const olc::vf4d& v)
 {
@@ -34,6 +34,13 @@ std::string ToString(const olc::vf4d& v)
         << v.z << ", " << v.w << ")";
     return out.str();
 }
+
+enum class Motion 
+{
+    Grounded = 0,
+    Falling  = 1,
+    Lashing  = 2
+};
 
 enum class Gravity
 {
@@ -97,16 +104,34 @@ struct Body
 
     Gravity gravity = Gravity::NegY;
     const Mesh* mesh = nullptr;
-    bool grounded = true;
+    Motion motion = Motion::Grounded;
+    olc::vf4d pull_dir;
 
     void SetGravity(Gravity g)
     {
-        if (gravity != g)
-        {
-            grounded = false;
-            gravity = g;
-        }
+        gravity = g;
     }
+
+    void Lash(Gravity gravity, olc::vf4d hit_point)
+    {
+        SetGravity(gravity);
+        pull_dir = (hit_point - pos).norm();
+        pull_dir.w = 0.0f;
+        motion = Motion::Lashing;
+    }
+
+    void Land()
+    {
+        motion = Motion::Grounded;
+    }
+
+    void Fall(Gravity gravity)
+    {
+        SetGravity(gravity);
+        motion = Motion::Falling;
+    }
+
+
 };
 
 // Add one face as two triangles.  Note, we are using clockwise culling.
@@ -238,7 +263,7 @@ public:
         if ((distance < min && gravityAlongDir < 0.0f) ||
             (distance > max && gravityAlongDir > 0.0f))
         {
-            body.grounded = true;
+            body.Land();
         }
 
     }
@@ -246,7 +271,11 @@ public:
     void BodyUpdate (Body& body, float dt)
     {
 
-        if (!body.grounded)
+        if (body.motion == Motion::Lashing)
+        {
+            body.velocity += body.pull_dir * gravityStrength * dt;
+        }
+        else if (body.motion == Motion::Falling)
         {
             body.velocity += GravityDirection(body.gravity) * gravityStrength * dt;
         }
@@ -308,6 +337,7 @@ public:
         if (hit)
         {
             hit_point = ray.origin + (ray.dir * min_t);
+
             // Remove ends of the hall from lashes
             if (hit_point.x >= hall.length || hit_point.x <=0)
             {
@@ -357,31 +387,37 @@ public:
             facing = -facing;
         }
 
-        if (keyboard.GetKey(olc::Key::K1).bPressed) player.SetGravity(Gravity::NegY);
-        if (keyboard.GetKey(olc::Key::K2).bPressed) player.SetGravity(Gravity::PosZ);
-        if (keyboard.GetKey(olc::Key::K3).bPressed) player.SetGravity(Gravity::PosY);
-        if (keyboard.GetKey(olc::Key::K4).bPressed) player.SetGravity(Gravity::NegZ);
+        if (keyboard.GetKey(olc::Key::K1).bPressed) player.Fall(Gravity::NegY);
+        if (keyboard.GetKey(olc::Key::K2).bPressed) player.Fall(Gravity::PosZ);
+        if (keyboard.GetKey(olc::Key::K3).bPressed) player.Fall(Gravity::PosY);
+        if (keyboard.GetKey(olc::Key::K4).bPressed) player.Fall(Gravity::NegZ);
 
-        olc::vf4d forward = Forward();
 
-        // Remove the velocity component along forward direction
-        player.velocity += forward * (-player.velocity.dot(forward));
-        if (keyboard.GetKey(olc::Key::W).bHeld) player.velocity += forward * moveSpeed;
-        if (keyboard.GetKey(olc::Key::S).bHeld) player.velocity += forward * -moveSpeed;
-
-        olc::vf4d surfaceUp = -GravityDirection(player.gravity);
-        olc::vf4d right_dir = surfaceUp.cross(forward);
-
-        // Remove only the velocity component along right_dir.
-        player.velocity += right_dir * (-player.velocity.dot(right_dir));
-
-        if (keyboard.GetKey(olc::Key::A).bHeld)
+        // Check WASD only when grounded
+        if (player.motion != Motion::Lashing)
         {
-            player.velocity += right_dir * -moveSpeed;
-        }
-        if (keyboard.GetKey(olc::Key::D).bHeld)
-        {
-            player.velocity += right_dir * moveSpeed;
+
+            olc::vf4d forward = Forward();
+
+            // Remove the velocity component along forward direction
+            player.velocity += forward * (-player.velocity.dot(forward));
+            if (keyboard.GetKey(olc::Key::W).bHeld) player.velocity += forward * moveSpeed;
+            if (keyboard.GetKey(olc::Key::S).bHeld) player.velocity += forward * -moveSpeed;
+
+            olc::vf4d surfaceUp = -GravityDirection(player.gravity);
+            olc::vf4d right_dir = surfaceUp.cross(forward);
+
+            // Remove only the velocity component along right_dir.
+            player.velocity += right_dir * (-player.velocity.dot(right_dir));
+
+            if (keyboard.GetKey(olc::Key::A).bHeld)
+            {
+                player.velocity += right_dir * -moveSpeed;
+            }
+            if (keyboard.GetKey(olc::Key::D).bHeld)
+            {
+                player.velocity += right_dir * moveSpeed;
+            }
         }
 
 
@@ -419,6 +455,12 @@ public:
 
         // Check Walls
         LashInfo lash = CheckWalls(ray);
+
+        bool newWall = lash.wall != player.gravity;
+        if (mouse.GetButton(0).bPressed && newWall && lash.hit)
+        {
+            player.Lash(lash.wall, lash.hit_point);
+        }
 
         /************** Drawing ****************/
 
