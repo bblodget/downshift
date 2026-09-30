@@ -24,6 +24,7 @@ constexpr float easeRate = 10.0f;       // roll ease rate.
 constexpr float moveSpeed = 5.0f;
 constexpr float camAhead = 1.0f;    // cam target ahead of the player
 constexpr float camHeight = 0.5f;   // cam target above the player
+constexpr float maxLashDist = 10.0f;
 
 std::string ToString(const olc::vf4d& v)
 {
@@ -40,6 +41,13 @@ enum class Gravity
     PosZ = 1,  // left wall
     PosY = 2,  // ceiling
     NegZ = 3,  // right wall
+};
+constexpr Gravity allGravities[] =
+{
+    Gravity::NegY,
+    Gravity::PosZ,
+    Gravity::PosY,
+    Gravity::NegZ
 };
 
 struct GravityInfo
@@ -71,6 +79,13 @@ struct Mesh
 {
     std::vector<olc::vf4d>  pos;  // vertices
     std::vector<olc::Pixel> col;  // one color per vertex
+};
+
+struct LashInfo
+{
+    bool hit;
+    Gravity wall;
+    olc::vf4d hit_point;
 };
 
 struct Body
@@ -178,6 +193,7 @@ public:
     Body player;
     float roll = 0.0f;
     float facing = 1.0f;
+    olc::utils::Camera3D::Ray ray;
 
     void BuildCubeMesh()
     {
@@ -254,7 +270,7 @@ public:
         return static_cast<int>(player.gravity) * PI/2;
     }
 
-    bool IsRolling() const { return std::abs(utils::Camera3D::WrapAngle(RollTarget() - roll)) > 0.01f; }
+    bool IsRolling() const { return std::abs(olc::utils::Camera3D::WrapAngle(RollTarget() - roll)) > 0.01f; }
 
     olc::vf4d Forward () const
     {
@@ -267,6 +283,42 @@ public:
         olc::vf4d cam_target = (rot * player.pos) + (Forward() * camAhead) + (screenUp * camHeight);
         cam.SetTarget(cam_target);
     }
+
+    LashInfo CheckWalls(const olc::utils::Camera3D::Ray& ray)
+    {
+        float min_t = maxLashDist;
+        Gravity min_gravity = Gravity::NegY;
+        bool hit = false;
+        olc::vf4d hit_point;
+
+        for (Gravity gravity : allGravities)
+        {
+            olc::vf4d g = GravityDirection(gravity);
+            float dg = ray.dir.dot(g);
+            if (dg <= 0.0f ) continue;
+            float t = (hall.HalfWidth() - ray.origin.dot(g)) / dg;
+            if (t>0 && t < min_t)
+            {
+                min_t = t;
+                min_gravity = gravity;
+                hit = true;
+            }
+        }
+
+        if (hit)
+        {
+            hit_point = ray.origin + (ray.dir * min_t);
+            // Remove ends of the hall from lashes
+            if (hit_point.x >= hall.length || hit_point.x <=0)
+            {
+                hit = false;
+            }
+        }
+
+
+        return {hit, min_gravity, hit_point};
+    }
+
 
     // Called once at the start, so create things here
     bool OnUserCreate() override
@@ -304,7 +356,6 @@ public:
             cam.TurnYaw(PI);
             facing = -facing;
         }
-
 
         if (keyboard.GetKey(olc::Key::K1).bPressed) player.SetGravity(Gravity::NegY);
         if (keyboard.GetKey(olc::Key::K2).bPressed) player.SetGravity(Gravity::PosZ);
@@ -345,7 +396,7 @@ public:
         if (IsRolling())
         {
             float t = std::min(1.0f, easeRate * dt);
-            roll += utils::Camera3D::WrapAngle(RollTarget() - roll) * t;
+            roll += olc::utils::Camera3D::WrapAngle(RollTarget() - roll) * t;
             if (!IsRolling()) roll = RollTarget();
         }
         // Rotate towards player gravity
@@ -356,6 +407,18 @@ public:
         SetCameraTarget(rot);
         cam.Update(dt);
         cam.Apply(draw);        // sets view + projection
+
+        // Compute mouse ray every frame
+        ray = cam.ScreenToRay(mouse.GetPosition(), ScreenSize());
+
+        // Translate ray to native hall cordinates
+        olc::mf4d ray_roll;
+        ray_roll.rotateX(-roll);
+        ray.origin = ray_roll * ray.origin;
+        ray.dir = ray_roll * ray.dir;
+
+        // Check Walls
+        LashInfo lash = CheckWalls(ray);
 
         /************** Drawing ****************/
 
@@ -388,8 +451,14 @@ public:
 
         // Draw HUD
         draw.WorldReset();
-		draw.String({ 2, 2 }, std::string("Gravity: ") + GravityName(player.gravity) 
-                + "\nPosition: " + ToString(player.pos), olc::Colour::YELLOW); 
+		draw.String({ 2, 2 }, std::string("Gravity: ") + GravityName(player.gravity)
+                + "\nPosition: " + ToString(player.pos), olc::Colour::YELLOW);
+        if (lash.hit)
+        {
+            draw.String({2, 20}, "Hit Point: " + ToString(lash.hit_point) + "\n" +
+                    "Hit Floor: " + GravityName(lash.wall) + "\n"
+                    ,olc::Colour::YELLOW);
+        }
 
         // Successful frame
         return true;
