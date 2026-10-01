@@ -1,6 +1,11 @@
-# name = First Steps
+name = First Steps
 par = 25
-start = 2 1 floor       # slice, lane, surface
+
+# start slice lane
+# slice and lane first index is 0.
+# slice is distance down the hall
+# lane is tile center from left wall
+start = 2 1.5
 
 # floor  left   ceil   right
   ****   ****   ****   ****

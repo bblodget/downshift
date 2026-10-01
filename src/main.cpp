@@ -184,9 +184,8 @@ void Wall(Mesh& mesh, olc::vf4d start, olc::vf4d x_step, olc::vf4d w_step,
 
 struct HallPosition
 {
-    int slice;
-    int lane;
-    Gravity floor;
+    float slice;
+    float lane;
 };
 
 struct Hall
@@ -196,7 +195,7 @@ struct Hall
     Mesh mesh;
     std::string name = "None";
     float par = 0.0f;
-    HallPosition start = {0, 0, Gravity::NegY};
+    HallPosition start = {0, 0};
 
     using Slice = std::array<std::string, 4>;
     std::vector<Slice> slices;
@@ -221,7 +220,7 @@ struct Hall
         lanes = 0;
         name = "None";
         par = 0.0f;
-        start = {0, 0, Gravity::NegY};
+        start = {0, 0};
         slices.clear();
 
         auto pos = path.find_last_of("/\\");
@@ -283,25 +282,16 @@ struct Hall
                 else if (key == "start")
                 {
                     std::istringstream parser(value);
-                    int slice, lane;
-                    std::string surface;
+                    float slice, lane;
 
-                    if (!(parser >> slice >> lane >> surface))
+                    if (!(parser >> slice >> lane))
                     {
+                        std::cerr << filename << ":" << lineno 
+                            << ": Error processing start =" << std::endl;
                         return false;  // missing or invalid values
                     }
                     start.slice = slice;
                     start.lane = lane;
-                    if (surface == "floor") start.floor = Gravity::NegY;
-                    else if (surface == "left") start.floor = Gravity::PosZ;
-                    else if (surface == "ceiling") start.floor = Gravity::PosY;
-                    else if (surface == "right") start.floor = Gravity::NegZ;
-                    else 
-                    {
-                        std::cerr << filename << ":" << lineno 
-                            << ": Error processing start =" << std::endl;
-                        return false;
-                    }
                     isStart = true;
                 }
             } else {
@@ -375,6 +365,18 @@ struct Hall
         {
             std::cerr << filename
                 << ": Error: No Start tile info specified." << std::endl;
+            return false;
+        }
+        if (start.slice < 0.0f || start.slice > (length - 1))
+        {
+            std::cerr << filename
+                << ": Error: Invalid start.slice." << std::endl;
+            return false;
+        }
+        if (start.lane < 0.0f || start.lane > (lanes - 1))
+        {
+            std::cerr << filename
+                << ": Error: Invalid start.lane." << std::endl;
             return false;
         }
        
@@ -578,7 +580,10 @@ public:
         // Build the player
         BuildCubeMesh();
         player.mesh = &cube;
-        player.pos = {hall.length/2.0f+2, -hall.HalfWidth() + player.halfSize.y, 0,};
+
+        player.pos = {hall.start.slice + 0.5f, 
+                      -hall.HalfWidth() + player.halfSize.y,
+                      (hall.HalfWidth() - 0.5f) - hall.start.lane };
 
         cam.SetPerspective(75.0f * PI / 180.0f, float(ScreenSize().x) / ScreenSize().y, 0.1f, 100.0f);
         cam.SetDistance(3.0f);          // distance in units
