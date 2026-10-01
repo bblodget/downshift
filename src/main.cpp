@@ -19,6 +19,8 @@ License: OLC-3, see LICENSE.md for details.
 #include <fstream>
 #include <sstream>
 #include <functional>
+#include <cmath>
+#include <limits>
 
 constexpr float PI = std::numbers::pi_v<float>;
 constexpr float gravityStrength = 40.0f;  // World units / second^2
@@ -216,6 +218,29 @@ struct Hall
         const auto& surface_row = slice_row[static_cast<int>(surface)];
         auto tile_char = surface_row[lane];
         return tile_char != '-';
+    }
+
+    bool IsSolidAt(Gravity surface, const olc::vf4d& pos) const
+    {
+        olc::vf4d left_dir = {0.0f, 0.0f, 0.0f, 0.0f};
+        switch (surface)
+        {
+            case Gravity::NegY:  // Floor
+                left_dir.z =  1.0f; break;
+            case Gravity::PosZ:  // Left Wall
+                left_dir.y =  1.0f; break;
+            case Gravity::PosY:  // Ceiling
+                left_dir.z = -1.0f; break;
+            case Gravity::NegZ:  // Right Wall
+                left_dir.y = -1.0f; break;
+        }
+        int slice = static_cast<int>(std::floor(pos.x));
+        int lane = static_cast<int>(std::floor(HalfWidth() - pos.dot(left_dir)));
+
+        slice = std::clamp(slice, 0, length-1);
+        lane =  std::clamp(lane,  0, lanes-1);
+
+        return IsSolid(surface, slice, lane);
     }
 
     bool Load(const std::string& path)
@@ -480,9 +505,14 @@ public:
         Wall(cube, {-hw ,-hw, -hw}, {0, 0, 1, 0}, {0, 1, 0, 0}, lanes, lanes, olc::Colour::WHITE * 0.8f, false);
     }
 
-    void ClampToSurface(Body& body, olc::vf4d dir, float min, float max)
+    void ClampToSurface(Body& body, olc::vf4d dir, float min, float max,
+            bool min_solid, bool max_solid)
     {
         float distance = body.pos.dot(dir);
+
+        if (!min_solid) min = std::numeric_limits<float>::lowest();
+        if (!max_solid) max = std::numeric_limits<float>::max();
+
         float clamped = std::clamp(distance, min, max);
         if (distance == clamped)
             return;
@@ -505,6 +535,15 @@ public:
 
     void BodyUpdate (Body& body, float dt)
     {
+        auto orig_body_pos = body.pos;
+
+        if (body.motion == Motion::Grounded)
+        {
+            if (!hall.IsSolidAt(body.gravity, body.pos))
+            {
+                body.Fall(body.gravity);
+            }
+        }
 
         if (body.motion == Motion::Lashing)
         {
@@ -518,15 +557,22 @@ public:
 
         float max_value = hall.length - body.halfSize.x;
         float min_value = body.halfSize.x;
-        ClampToSurface(body, {1.0f, 0.0f, 0.0f, 0.0f}, min_value, max_value);
+        ClampToSurface(body, {1.0f, 0.0f, 0.0f, 0.0f}, min_value, max_value,
+                true, true);
 
         max_value = (hall.HalfWidth()-body.halfSize.y);
         min_value = -max_value;
-        ClampToSurface(body, {0.0f, 1.0f, 0.0f, 0.0f}, min_value, max_value);
+        ClampToSurface(body, {0.0f, 1.0f, 0.0f, 0.0f}, min_value, max_value,
+                hall.IsSolidAt(Gravity::NegY, body.pos),
+                hall.IsSolidAt(Gravity::PosY, body.pos)
+                );
 
         max_value = (hall.HalfWidth()-body.halfSize.z);
         min_value = -max_value;
-        ClampToSurface(body, {0.0f, 0.0f, 1.0f, 0.0f}, min_value, max_value);
+        ClampToSurface(body, {0.0f, 0.0f, 1.0f, 0.0f}, min_value, max_value,
+                hall.IsSolidAt(Gravity::NegZ, body.pos),
+                hall.IsSolidAt(Gravity::PosZ, body.pos)
+                );
     }
 
     float RollTarget() const
