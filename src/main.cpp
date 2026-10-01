@@ -29,6 +29,7 @@ constexpr float moveSpeed = 5.0f;
 constexpr float camAhead = 1.0f;    // cam target ahead of the player
 constexpr float camHeight = 0.5f;   // cam target above the player
 constexpr float maxLashDist = 20.0f;
+constexpr float tolerance = 0.01f;  // floating point tolerance
 
 // Remove leading and trailing whitespace
 std::string Trim(const std::string& text)
@@ -505,28 +506,36 @@ public:
         Wall(cube, {-hw ,-hw, -hw}, {0, 0, 1, 0}, {0, 1, 0, 0}, lanes, lanes, olc::Colour::WHITE * 0.8f, false);
     }
 
-    void ClampToSurface(Body& body, olc::vf4d dir, float min, float max,
-            bool min_solid, bool max_solid)
+    void ClampToSurface(Body& body, const olc::vf4d& dir, float min, float max,
+            bool min_solid, bool max_solid, const olc::vf4d& prev_body_pos)
     {
+        float previous = prev_body_pos.dot(dir);
         float distance = body.pos.dot(dir);
 
-        if (!min_solid) min = std::numeric_limits<float>::lowest();
-        if (!max_solid) max = std::numeric_limits<float>::max();
+        bool hitMin = min_solid
+            && previous >= min - tolerance // previous above surface
+            && distance < min;  // current below surface
 
-        float clamped = std::clamp(distance, min, max);
-        if (distance == clamped)
+        bool hitMax = max_solid
+            && previous <= max + tolerance // previous below surface
+            && distance > max;  // current above surface
+
+        if (!hitMin && !hitMax)
             return;
 
+        // Min or Max bound?
+        float bound = hitMin ? min : max;
+
         // Correct only the position component along dir.
-        body.pos += dir * (clamped - distance);
+        body.pos += dir * (bound - distance);
 
         // Remove only the velocity component along dir.
         body.velocity += dir * (-body.velocity.dot(dir));
 
         float gravityAlongDir = GravityDirection(body.gravity).dot(dir);
 
-        if ((distance < min && gravityAlongDir < 0.0f) ||
-            (distance > max && gravityAlongDir > 0.0f))
+        if ((hitMin && gravityAlongDir < 0.0f) ||
+            (hitMax && gravityAlongDir > 0.0f))
         {
             body.Land();
         }
@@ -535,7 +544,7 @@ public:
 
     void BodyUpdate (Body& body, float dt)
     {
-        auto orig_body_pos = body.pos;
+        olc::vf4d prev_body_pos = body.pos;
 
         if (body.motion == Motion::Grounded)
         {
@@ -558,20 +567,22 @@ public:
         float max_value = hall.length - body.halfSize.x;
         float min_value = body.halfSize.x;
         ClampToSurface(body, {1.0f, 0.0f, 0.0f, 0.0f}, min_value, max_value,
-                true, true);
+                true, true, prev_body_pos);
 
         max_value = (hall.HalfWidth()-body.halfSize.y);
         min_value = -max_value;
         ClampToSurface(body, {0.0f, 1.0f, 0.0f, 0.0f}, min_value, max_value,
                 hall.IsSolidAt(Gravity::NegY, body.pos),
-                hall.IsSolidAt(Gravity::PosY, body.pos)
+                hall.IsSolidAt(Gravity::PosY, body.pos),
+                prev_body_pos
                 );
 
         max_value = (hall.HalfWidth()-body.halfSize.z);
         min_value = -max_value;
         ClampToSurface(body, {0.0f, 0.0f, 1.0f, 0.0f}, min_value, max_value,
                 hall.IsSolidAt(Gravity::NegZ, body.pos),
-                hall.IsSolidAt(Gravity::PosZ, body.pos)
+                hall.IsSolidAt(Gravity::PosZ, body.pos),
+                prev_body_pos
                 );
     }
 
