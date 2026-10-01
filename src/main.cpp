@@ -14,11 +14,11 @@ License: OLC-3, see LICENSE.md for details.
 #include "olcPixelGameEngine3.h"
 #include "camera3D.h"
 #include <numbers>
-#include <sstream>
 #include <iomanip>
 #include <algorithm>
 #include <fstream>
 #include <sstream>
+#include <functional>
 
 constexpr float PI = std::numbers::pi_v<float>;
 constexpr float gravityStrength = 40.0f;  // World units / second^2
@@ -165,13 +165,17 @@ void Face(Mesh& mesh, olc::vf4d a, olc::vf4d b, olc::vf4d c, olc::vf4d d, olc::P
 // Index Finger point +Z (w_step, into the screen) x Middle finger to right +X (x_step)
 // Thumb point +Y, see the floor from above.
 void Wall(Mesh& mesh, olc::vf4d start, olc::vf4d x_step, olc::vf4d w_step, 
-          int x_max, int w_max, olc::Pixel color, bool cw = true)
+          int x_max, int w_max, olc::Pixel color, bool cw = true,
+          std::function<bool(int, int)> isSolid = {})
 {
     float mc = 1.0f;  // mulitply color
     for (int i=0; i<x_max; i++) 
     {
         for (int j=0; j<w_max; j++)
         {
+            if (isSolid && !isSolid(i,j))
+                continue;  // skip missing tiles
+
             if ((i+j) & 1) mc=0.85f; else mc=1.0f;
             olc::vf4d offset = start + (x_step * i) + (w_step * j);
             if (cw)
@@ -206,6 +210,13 @@ struct Hall
         return lanes * 0.5f;
     }
 
+    bool IsSolid(Gravity surface, int slice , int lane) const
+    {
+        const auto& slice_row = slices.at(slice);
+        const auto& surface_row = slice_row[static_cast<int>(surface)];
+        auto tile_char = surface_row[lane];
+        return tile_char != '-';
+    }
 
     bool Load(const std::string& path)
     {
@@ -395,18 +406,36 @@ struct Hall
         mesh.col.clear();
 
         // Draw Floor -Y Bottom
-        Wall(mesh, {0,-hw,-hw}, {1, 0, 0, 0}, {0, 0, 1, 0}, length, lanes, olc::Pixel( 60, 60,  60), true);
+        Wall(mesh, {0,-hw,-hw}, {1, 0, 0, 0}, {0, 0, 1, 0}, 
+                length, lanes, olc::Pixel( 60, 60,  60), true,
+                [&](int i, int j)
+                { return IsSolid(Gravity::NegY, i, lanes - 1 - j); }
+                );
         // Draw Ceiling +Y Top
-        Wall(mesh, {0, hw,-hw}, {1, 0, 0, 0}, {0, 0, 1, 0}, length, lanes, olc::Pixel( 220, 220,  220), false);
+        Wall(mesh, {0, hw,-hw}, {1, 0, 0, 0}, {0, 0, 1, 0}, 
+                length, lanes, olc::Pixel( 220, 220,  220), false,
+                [&](int i, int j)
+                { return IsSolid(Gravity::PosY, i, j); }
+                );
         // Draw Left Wall, +Z North
-        Wall(mesh, {0,-hw, hw}, {1, 0, 0, 0}, {0, 1, 0, 0}, length, lanes, olc::Pixel( 60, 60,  150), true);
+        Wall(mesh, {0,-hw, hw}, {1, 0, 0, 0}, {0, 1, 0, 0}, 
+                length, lanes, olc::Pixel( 60, 60,  150), true,
+                [&](int i, int j)
+                { return IsSolid(Gravity::PosZ, i, lanes - 1 - j); }
+                );
         // Draw Right Wall, -Z South
-        Wall(mesh, {0,-hw, -hw}, {1, 0, 0, 0}, {0, 1, 0, 0}, length, lanes, olc::Pixel( 150, 60,  60), false);
+        Wall(mesh, {0,-hw, -hw}, {1, 0, 0, 0}, {0, 1, 0, 0}, 
+                length, lanes, olc::Pixel( 150, 60,  60), false,
+                [&](int i, int j)
+                { return IsSolid(Gravity::NegZ, i, j); }
+                );
 
         // Draw End of Tunnel, +X East
-        Wall(mesh, {xe,-hw, -hw}, {0, 0, 1, 0}, {0, 1, 0, 0}, lanes, lanes, olc::Pixel( 60, 150,  60), false);
+        Wall(mesh, {xe,-hw, -hw}, {0, 0, 1, 0}, {0, 1, 0, 0}, 
+                lanes, lanes, olc::Pixel( 60, 150,  60), false);
         // Draw End of Tunnel, -X West
-        Wall(mesh, {xw,-hw, -hw}, {0, 0, 1, 0}, {0, 1, 0, 0}, lanes, lanes, olc::Pixel( 150, 150,  60), true);
+        Wall(mesh, {xw,-hw, -hw}, {0, 0, 1, 0}, {0, 1, 0, 0}, 
+                lanes, lanes, olc::Pixel( 150, 150,  60), true);
     }
 };
 
