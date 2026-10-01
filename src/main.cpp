@@ -30,6 +30,7 @@ constexpr float camAhead = 1.0f;    // cam target ahead of the player
 constexpr float camHeight = 0.5f;   // cam target above the player
 constexpr float maxLashDist = 20.0f;
 constexpr float tolerance = 0.01f;  // floating point tolerance
+constexpr float fallTime = 1.5f;  // Fall before respawn
 
 // Remove leading and trailing whitespace
 std::string Trim(const std::string& text)
@@ -492,6 +493,7 @@ public:
     float roll = 0.0f;
     float facing = 1.0f;
     olc::utils::Camera3D::Ray ray;
+    float outTime = 0.0f;
 
     void BuildCubeMesh()
     {
@@ -666,6 +668,24 @@ public:
         return {hit, min_gravity, hit_point};
     }
 
+    void ResetPlayer()
+    {
+        roll = 0.0f;
+        facing = 1.0f;
+        outTime = 0.0f;
+        player.velocity = {0.0f, 0.0f, 0.0f, 0.0f};
+        player.gravity = Gravity::NegY;
+        player.motion = Motion::Grounded;
+        player.pull_dir = {0.0f, 0.0f, 0.0f, 0.0f};
+        player.pos = {hall.start.slice + 0.5f, 
+                      -hall.HalfWidth() + player.halfSize.y,
+                      (hall.HalfWidth() - 0.5f) - hall.start.lane };
+
+        cam.SetYaw(-PI/2);              // turned so we down X axis
+        SetCameraTarget(olc::mf4d());
+
+    }
+
 
     // Called once at the start, so create things here
     bool OnUserCreate() override
@@ -681,16 +701,14 @@ public:
         BuildCubeMesh();
         player.mesh = &cube;
 
-        player.pos = {hall.start.slice + 0.5f, 
-                      -hall.HalfWidth() + player.halfSize.y,
-                      (hall.HalfWidth() - 0.5f) - hall.start.lane };
-
         cam.SetPerspective(75.0f * PI / 180.0f, float(ScreenSize().x) / ScreenSize().y, 0.1f, 100.0f);
         cam.SetDistance(3.0f);          // distance in units
-        cam.SetYaw(-PI/2);              // turned so we down X axis
         cam.SetPitch(PI/18);            // Look down at 10 degrees.
         cam.SetYawEaseRate(5.0f);
-        SetCameraTarget(olc::mf4d());
+
+        // Reset Player at starting position
+        ResetPlayer();
+
         return true;
     }
 
@@ -749,6 +767,19 @@ public:
 
         // Update player
         BodyUpdate(player, dt);
+
+        // Out of bounds check
+        if (!hall.Contains(player.pos)) 
+        {
+            outTime += dt;
+            if (outTime > fallTime)
+            {
+                ResetPlayer();
+            } 
+        } else
+        {
+            outTime = 0.0f;
+        }
 
         // Update Hall
         // Rotate towards player gravity down
