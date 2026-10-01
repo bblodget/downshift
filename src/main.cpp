@@ -224,6 +224,12 @@ struct Hall
 
     bool IsSolid(Gravity surface, int slice , int lane) const
     {
+        // Nothing solid outside the hall.
+        if (slice < 0 || slice > length-1 
+                || lane <0 || lane > lanes - 1)
+        {
+            return false;
+        }
         const auto& slice_row = slices.at(slice);
         const auto& surface_row = slice_row[static_cast<int>(surface)];
         auto tile_char = surface_row[lane];
@@ -246,9 +252,6 @@ struct Hall
         }
         int slice = static_cast<int>(std::floor(pos.x));
         int lane = static_cast<int>(std::floor(HalfWidth() - pos.dot(left_dir)));
-
-        slice = std::clamp(slice, 0, length-1);
-        lane =  std::clamp(lane,  0, lanes-1);
 
         return IsSolid(surface, slice, lane);
     }
