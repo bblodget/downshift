@@ -207,6 +207,15 @@ struct Hall
     using Slice = std::array<std::string, 4>;
     std::vector<Slice> slices;
 
+    bool Contains(const olc::vf4d& pos) const
+    {
+        return (pos.x < length && pos.x > 0
+                    && pos.y < HalfWidth() + tolerance
+                    && pos.y > -HalfWidth() - tolerance
+                    && pos.z < HalfWidth() + tolerance
+                    && pos.z > -HalfWidth() - tolerance
+               );
+    }
 
     float HalfWidth() const
     {
@@ -641,8 +650,10 @@ public:
         {
             hit_point = ray.origin + (ray.dir * min_t);
 
-            // Remove ends of the hall from lashes
-            if (hit_point.x >= hall.length || hit_point.x <=0)
+            // Remove if hit_point not in the hall
+            if (!hall.Contains(hit_point) 
+                    || !hall.IsSolidAt(min_gravity, hit_point)
+               )
             {
                 hit = false;
             }
@@ -769,7 +780,11 @@ public:
         bool newWall = lash.wall != player.gravity;
         if (mouse.GetButton(0).bPressed && newWall && lash.hit)
         {
-            player.Lash(lash.wall, lash.hit_point);
+            // Check that the player is in the hall
+            if (hall.Contains(player.pos))
+            {
+                player.Lash(lash.wall, lash.hit_point);
+            }
         }
 
         /************** Drawing ****************/
