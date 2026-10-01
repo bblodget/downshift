@@ -89,10 +89,9 @@ elseif(UNIX AND NOT APPLE)
     endif()
 endif()
 
-# ---- Assets: copy next to the binary so it runs from build/ ----------------
+# ---- Assets: symlink next to the binary so it runs from build/ -------------
+# A link (not a copy) means edits to assets show up without rebuilding.
 # (web builds embed them via --preload-file above)
 if(NOT EMSCRIPTEN)
-    add_custom_command(TARGET ${GAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-                ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:${GAME}>/assets)
+    file(CREATE_LINK ${CMAKE_SOURCE_DIR}/assets ${CMAKE_BINARY_DIR}/assets SYMBOLIC)
 endif()

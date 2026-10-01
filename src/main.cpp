@@ -4,7 +4,7 @@
     OLC CodeJam 2026 entry.
 
     Copyright (c) 2026 Brandon Blodget
-    License: OLC-3, see LICENSE.md for details.
+License: OLC-3, see LICENSE.md for details.
 */
 
 
@@ -17,6 +17,8 @@
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
+#include <fstream>
+#include <sstream>
 
 constexpr float PI = std::numbers::pi_v<float>;
 constexpr float gravityStrength = 40.0f;  // World units / second^2
@@ -25,6 +27,17 @@ constexpr float moveSpeed = 5.0f;
 constexpr float camAhead = 1.0f;    // cam target ahead of the player
 constexpr float camHeight = 0.5f;   // cam target above the player
 constexpr float maxLashDist = 20.0f;
+
+// Remove leading and trailing whitespace
+std::string Trim(const std::string& text)
+{
+    auto first = text.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos)
+        return "";
+
+    auto last = text.find_last_not_of(" \t\r\n");
+    return text.substr(first, last - first + 1);
+}
 
 std::string ToString(const olc::vf4d& v)
 {
@@ -169,15 +182,206 @@ void Wall(Mesh& mesh, olc::vf4d start, olc::vf4d x_step, olc::vf4d w_step,
     }
 }
 
+struct HallPosition
+{
+    int slice;
+    int lane;
+    Gravity floor;
+};
+
 struct Hall
 {
-    int length = 30;
-    int lanes = 4;
+    int length = 0;
+    int lanes = 0;
     Mesh mesh;
+    std::string name = "None";
+    float par = 0.0f;
+    HallPosition start = {0, 0, Gravity::NegY};
+
+    using Slice = std::array<std::string, 4>;
+    std::vector<Slice> slices;
+
+
     float HalfWidth() const
     {
         return lanes * 0.5f;
     }
+
+
+    bool Load(const std::string& path)
+    {
+
+        bool isName = false;
+        bool isPar = false;
+        bool isStart = false;
+        int lineno = 0;
+
+        // Reset member variables
+        length = 0;
+        lanes = 0;
+        name = "None";
+        par = 0.0f;
+        start = {0, 0, Gravity::NegY};
+        slices.clear();
+
+        auto pos = path.find_last_of("/\\");
+        std::string filename =
+            (pos == std::string::npos) ? path : path.substr(pos + 1);
+
+        std::ifstream file(path);
+
+        // Check if file exists
+        if (!file)
+        {
+            // Could not open file
+            std::cerr << filename
+                << ": Could not open file" << std::endl;
+            return false;
+        }
+
+        // Process all the lines
+        std::string line;
+        while (std::getline(file, line))
+        {
+            lineno++;  // increment the line number
+
+            // Remove Comment from line
+            auto comment = line.find('#');
+            if (comment != std::string::npos)
+            {
+                line.erase(comment);
+            }
+
+            // Trim
+            line = Trim(line);
+            if (line == "") continue;   // skip empty lines
+
+            auto equals = line.find('=');
+            if (equals != std::string::npos)
+            {
+                std::string key = Trim(line.substr(0, equals));
+                std::string value = Trim(line.substr(equals + 1));
+
+                if (key == "name")
+                {
+                    name = value;
+                    isName = true;
+                }
+                else if (key == "par")
+                {
+                    try 
+                    {
+                        par = std::stof(value);
+                        isPar = true;
+                    } catch (const std::exception&)
+                    {
+                        std::cerr << filename << ":" << lineno 
+                            << ": Error processing par =" << std::endl;
+                        return false; // invalid
+                    }
+                }
+                else if (key == "start")
+                {
+                    std::istringstream parser(value);
+                    int slice, lane;
+                    std::string surface;
+
+                    if (!(parser >> slice >> lane >> surface))
+                    {
+                        return false;  // missing or invalid values
+                    }
+                    start.slice = slice;
+                    start.lane = lane;
+                    if (surface == "floor") start.floor = Gravity::NegY;
+                    else if (surface == "left") start.floor = Gravity::PosZ;
+                    else if (surface == "ceiling") start.floor = Gravity::PosY;
+                    else if (surface == "right") start.floor = Gravity::NegZ;
+                    else 
+                    {
+                        std::cerr << filename << ":" << lineno 
+                            << ": Error processing start =" << std::endl;
+                        return false;
+                    }
+                    isStart = true;
+                }
+            } else {
+                // Handle the map lines
+                std::istringstream parser(line);
+                Slice slice;  // One row: four strings
+
+                if (!(parser >> slice[0] >> slice[1] >> slice[2] >> slice[3]))
+                {
+                    std::cerr << filename << ":" << lineno 
+                        << ": Error with map line" << std::endl;
+                    return false;
+                }
+                // More lanes?
+                std::string extra;
+                if (parser >> extra)
+                {
+                    std::cerr << filename << ":" << lineno 
+                        << ": Error: more than 4 surfaces" << std::endl;
+                    return false;
+                }
+
+                // Check the Slice
+                auto slanes = slice[0].length();
+                if (slice[1].length() != slanes 
+                        || slice[2].length() != slanes
+                        || slice[3].length() != slanes)
+                {
+                    std::cerr << filename << ":" << lineno 
+                        << ": Error different lane widths" << std::endl;
+                    return false;
+                }
+                if (lanes == 0)
+                {
+                    // First time being set
+                    lanes = slanes;
+                } else
+                {
+                    // Check same lane width as previous slices
+                    if (lanes != (int)slanes)
+                    {
+                        std::cerr << filename << ":" << lineno 
+                            << ": Error slices have different lane widths" << std::endl;
+                        return false;
+                    }
+                }
+                slices.push_back(slice);
+                length++;       // increase hall length by 1 sliace
+            }
+        }
+        if (length == 0)
+        {
+            std::cerr << filename
+                << ": Error: Hall length is zero." << std::endl;
+            return false;
+        }
+
+        if (!isName)
+        {
+            std::cerr << filename
+                << ": Error: No level name specified." << std::endl;
+            return false;
+        }
+        if (!isPar)
+        {
+            std::cerr << filename
+                << ": Error: No Par time specified." << std::endl;
+            return false;
+        }
+        if (!isStart)
+        {
+            std::cerr << filename
+                << ": Error: No Start tile info specified." << std::endl;
+            return false;
+        }
+       
+        return true;
+    }
+
+
     void Build()
     {
         float xw = 0.0f;            // x west pos
@@ -365,6 +569,10 @@ public:
     bool OnUserCreate() override
     {
         // Build the Hall
+        if (!hall.Load("./assets/levels/level01.txt"))
+        {
+            return false;
+        }
         hall.Build();
 
         // Build the player
@@ -373,11 +581,11 @@ public:
         player.pos = {hall.length/2.0f+2, -hall.HalfWidth() + player.halfSize.y, 0,};
 
         cam.SetPerspective(75.0f * PI / 180.0f, float(ScreenSize().x) / ScreenSize().y, 0.1f, 100.0f);
-        SetCameraTarget(olc::mf4d());
         cam.SetDistance(3.0f);          // distance in units
         cam.SetYaw(-PI/2);              // turned so we down X axis
         cam.SetPitch(PI/18);            // Look down at 10 degrees.
         cam.SetYawEaseRate(5.0f);
+        SetCameraTarget(olc::mf4d());
         return true;
     }
 
