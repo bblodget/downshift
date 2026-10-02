@@ -21,6 +21,7 @@ License: OLC-3, see LICENSE.md for details.
 #include <functional>
 #include <cmath>
 #include <limits>
+#include <random>
 
 constexpr float PI = std::numbers::pi_v<float>;
 constexpr float gravityStrength = 40.0f;  // World units / second^2
@@ -230,7 +231,7 @@ struct Hall
     Mesh mesh;
     Mesh gateMesh;
     std::string name = "None";
-    float par = 0.0f;
+    float parTime = 0.0f;
     HallPosition start = {0, 0};
 
     using Slice = std::array<std::string, 4>;
@@ -340,7 +341,7 @@ struct Hall
         length = 0;
         lanes = 0;
         name = "None";
-        par = 0.0f;
+        parTime = 0.0f;
         start = {0, 0};
         slices.clear();
 
@@ -391,7 +392,7 @@ struct Hall
                 {
                     try 
                     {
-                        par = std::stof(value);
+                        parTime = std::stof(value);
                         isPar = true;
                     } catch (const std::exception&)
                     {
@@ -571,9 +572,36 @@ public:
     float facing = 1.0f;
     olc::utils::Camera3D::Ray ray;
     float outTime = 0.0f;
-    float elapsedTime = 0.0f;
+    float spinTime = 0.0f;
+    float levelTime = 0.0f;
     bool showDebug = false;
     bool levelComplete = false;
+    bool levelStart = false;
+    std::string completionComment = "How did this get here?";
+
+    std::string CompletionComment(bool beatPar)
+    {
+        static std::mt19937 rng {std::random_device{}()};
+
+        static const char* fast[] =
+        {
+            "Gravity-defying speed!",
+            "You made that look easy.",
+            "The hallway never stood a chance.",
+            "Downshift? More like overdrive!"
+        };
+
+        static const char* slow[] =
+        {
+            "Taking the scenic route?",
+            "All change collected. Eventually.",
+            "Gravity was working overtime.",
+            "Next time, less sightseeing!"
+        };
+
+        std::uniform_int_distribution<int> pick(0,3);
+        return beatPar ? fast[pick(rng)] : slow[pick(rng)];
+    }
 
     void CollectCoins()
     {
@@ -607,7 +635,7 @@ public:
                 -static_cast<int>(coin.surface) * PI / 2.0f);
 
             olc::mf4d crot;
-            crot.rotateY(elapsedTime * spinSpeed);
+            crot.rotateY(spinTime * spinSpeed);
 
             draw.SetModelMatrix(rot * ctr * surfaceRot * crot);
             draw.Mesh(olc::Structure::List, coinMesh.pos, coinMesh.col);
@@ -863,6 +891,15 @@ public:
         return {hit, min_gravity, hit_point};
     }
 
+    void ResetLevel()
+    {
+        levelTime = 0.0f;
+        levelStart = false;
+        levelComplete = false;
+        hall.LoadCoins();
+        ResetPlayer();
+    }
+
     void ResetPlayer()
     {
         roll = 0.0f;
@@ -907,8 +944,8 @@ public:
         cam.SetPitch(PI/18);            // Look down at 10 degrees.
         cam.SetYawEaseRate(5.0f);
 
-        // Reset Player at starting position
-        ResetPlayer();
+        // Reset Level
+        ResetLevel();
 
         return true;
     }
@@ -918,7 +955,12 @@ public:
     bool OnUserUpdate(float dt) override
     {
         dt =std::min(dt, 1.0f / 30.0f);
-        elapsedTime = std::fmod(elapsedTime + dt, spinAngle);
+        spinTime = std::fmod(spinTime + dt, spinAngle);
+
+        if (levelStart && !levelComplete)
+        {
+            levelTime += dt;
+        }
 
         /************** Check Controls ****************/
 
@@ -932,9 +974,7 @@ public:
         // Press R to restart
         if (keyboard.GetKey(olc::Key::R).bPressed)
         {
-            levelComplete = false;
-            hall.LoadCoins();
-            ResetPlayer();
+            ResetLevel();
         }
 
         if (!levelComplete)
@@ -981,6 +1021,17 @@ public:
 
         /************** Game State Update ****************/
 
+        // Start the level timer?
+        if (!levelStart)
+        {
+            if (player.velocity.x != 0.0f 
+                || player.velocity.y != 0.0f
+                || player.velocity.z != 0.0f)
+            {
+                levelStart = true;
+            }
+        }
+
         // Update player
         if (!levelComplete)
         {
@@ -992,6 +1043,10 @@ public:
         if (hall.GateOpen() && player.pos.x >=
                 hall.length - player.halfSize.x - tolerance) 
         {
+            if (!levelComplete)
+            {
+                completionComment = CompletionComment(levelTime <= hall.parTime);
+            }
             levelComplete = true;
         }
 
@@ -1094,9 +1149,25 @@ public:
         coinStr << "Coins: " << hall.CoinsCollected() << "/"
             << hall.coins.size();
         draw.String({2,2}, coinStr.str(), olc::Colour::YELLOW);
+
+        std::ostringstream timeStr;
+        timeStr << std::fixed << std::setprecision(2) 
+            << "Time: " << levelTime << "\n"
+            << "Par : " << hall.parTime ;
+        olc::vf2d size = draw.GetTextSize(timeStr.str());
+        float x = ScreenSize().x - size.x - 2;
+        draw.String({x,2}, timeStr.str(), olc::Colour::YELLOW);
+
         if (levelComplete)
         {
-            draw.String({2,10}, "Level Complete!", olc::Colour::YELLOW);
+
+            std::ostringstream completeStr;
+            completeStr << std::fixed << std::setprecision(2)
+                << "Level Complete!" << "\n"
+                << "Par Time : " << hall.parTime << "\n"
+                << "Your Time: " << levelTime << "\n"
+                << completionComment;
+            draw.String({2,10}, completeStr.str(), olc::Colour::YELLOW);
         }
 
         if (showDebug)

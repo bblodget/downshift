@@ -1,5 +1,5 @@
 name = First Steps
-par = 25
+par = 35
 
 # start slice lane
 # slice and lane first index is 0.
