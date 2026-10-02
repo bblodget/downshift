@@ -31,6 +31,8 @@ constexpr float camHeight = 0.5f;   // cam target above the player
 constexpr float maxLashDist = 20.0f;
 constexpr float tolerance = 0.01f;  // floating point tolerance
 constexpr float fallTime = 1.5f;  // Fall before respawn
+constexpr float spinSpeed = 2.0f; // rad/sec
+constexpr float spinAngle = (2.0f * PI)/spinSpeed;  // radians
 
 // Remove leading and trailing whitespace
 std::string Trim(const std::string& text)
@@ -151,14 +153,21 @@ struct Body
 
 };
 
+void Triangle(Mesh& mesh, olc::vf4d a, olc::vf4d b, olc::vf4d c, olc::Pixel color)
+{
+    for (auto v: { a, b, c})
+    {
+        mesh.pos.push_back({v.x, v.y, v.z, 1.0f});
+        mesh.col.push_back(color);
+    }
+}
+
+
 // Add one face as two triangles.  Note, we are using clockwise culling.
 void Face(Mesh& mesh, olc::vf4d a, olc::vf4d b, olc::vf4d c, olc::vf4d d, olc::Pixel color)
 {
-    for (auto v : { a, b, c,  a, c, d })
-    {
-        mesh.pos.push_back({v.x, v.y, v.z, 1.0f });
-        mesh.col.push_back(color);
-    }
+    Triangle(mesh, a, b, c, color);
+    Triangle(mesh, a, c, d, color);
 }
 
 // cw picks which side of the wall is visible (we cull ClockWise).
@@ -488,12 +497,46 @@ public:
 
     Hall hall;
     Mesh cube;
+    Mesh crystal;
     olc::utils::Camera3D    cam;
     Body player;
     float roll = 0.0f;
     float facing = 1.0f;
     olc::utils::Camera3D::Ray ray;
     float outTime = 0.0f;
+    float elapsedTime = 0.0f;
+
+    void BuildCrystalMesh(float h, float r, olc::Pixel color)
+    {
+        // Empty the crystal mesh before building
+        crystal.pos.clear();
+        crystal.col.clear();
+
+        // Points
+        olc::vf4d h1 = {0.0f, h   , 0.0f};
+        olc::vf4d h2 = {0.0f, -h  , 0.0f};
+        olc::vf4d r1 = {r   , 0.0f, 0.0f};
+        olc::vf4d r2 = {0.0f, 0.0f, r   };
+        olc::vf4d r3 = {-r  , 0.0f, 0.0f};
+        olc::vf4d r4 = {0.0f, 0.0f, -r  };
+
+        float light = 1.0f;
+        float dark = 0.85f;
+
+        // Triangles
+        Triangle(crystal, h1, r2, r1, color * light);
+        Triangle(crystal, h1, r3, r2, color * dark);
+        Triangle(crystal, h1, r4, r3, color * light);
+        Triangle(crystal, h1, r1, r4, color * dark);
+
+        light = 0.64f;
+        dark = 0.5f;
+
+        Triangle(crystal, h2, r1, r2, color * light);
+        Triangle(crystal, h2, r2, r3, color * dark);
+        Triangle(crystal, h2, r3, r4, color * light);
+        Triangle(crystal, h2, r4, r1, color * dark);
+    }
 
     void BuildCubeMesh()
     {
@@ -697,6 +740,9 @@ public:
         }
         hall.Build();
 
+        // Build the crystal mesh
+        BuildCrystalMesh(0.35f, 0.2f, olc::Colour::YELLOW);
+
         // Build the player
         BuildCubeMesh();
         player.mesh = &cube;
@@ -717,6 +763,7 @@ public:
     bool OnUserUpdate(float dt) override
     {
         dt =std::min(dt, 1.0f / 30.0f);
+        elapsedTime = std::fmod(elapsedTime + dt, spinAngle);
 
         /************** Check Controls ****************/
 
@@ -842,6 +889,16 @@ public:
         // So scale, then translate, then rotate
         draw.SetModelMatrix(rot * tr * sc);
         draw.Mesh(olc::Structure::List, player.mesh->pos, player.mesh->col, player.tint);
+
+        // Draw Crystal
+        olc::vf4d crystalPos = {5.0f, -1.0f, 0.0f};
+
+        olc::mf4d ctr;
+        ctr.translate(crystalPos);
+        olc::mf4d crot;
+        crot.rotateY(elapsedTime * spinSpeed);
+        draw.SetModelMatrix(rot * ctr * crot);
+        draw.Mesh(olc::Structure::List, crystal.pos, crystal.col);
 
         // Draw Gravity Arrow
         draw.SetModelMatrix(rot);
