@@ -228,6 +228,7 @@ struct Hall
     int length = 0;
     int lanes = 0;
     Mesh mesh;
+    Mesh gateMesh;
     std::string name = "None";
     float par = 0.0f;
     HallPosition start = {0, 0};
@@ -236,6 +237,12 @@ struct Hall
     std::vector<Slice> slices;
 
     std::vector<Coin> coins;
+
+    bool GateOpen() const
+    {
+        return (CoinsCollected() == static_cast<int>(coins.size()));
+    }
+
 
     int CoinsCollected() const
     {
@@ -507,6 +514,8 @@ struct Hall
         // Empty the mesh before building
         mesh.pos.clear();
         mesh.col.clear();
+        gateMesh.pos.clear();
+        gateMesh.col.clear();
 
         // Draw Floor -Y Bottom
         Wall(mesh, {0,-hw,-hw}, {1, 0, 0, 0}, {0, 0, 1, 0}, 
@@ -528,17 +537,19 @@ struct Hall
                 );
         // Draw Right Wall, -Z South
         Wall(mesh, {0,-hw, -hw}, {1, 0, 0, 0}, {0, 1, 0, 0}, 
-                length, lanes, olc::Pixel( 150, 60,  60), false,
+                length, lanes, olc::Pixel( 150, 60,  150), false,
                 [&](int i, int j)
                 { return IsSolid(Gravity::NegZ, i, j); }
                 );
 
-        // Draw End of Tunnel, +X East
-        Wall(mesh, {xe,-hw, -hw}, {0, 0, 1, 0}, {0, 1, 0, 0}, 
-                lanes, lanes, olc::Pixel( 60, 150,  60), false);
         // Draw End of Tunnel, -X West
         Wall(mesh, {xw,-hw, -hw}, {0, 0, 1, 0}, {0, 1, 0, 0}, 
                 lanes, lanes, olc::Pixel( 150, 150,  60), true);
+
+        // Draw the Gate!
+        // Draw End of Tunnel, +X East
+        Wall(gateMesh, {xe,-hw, -hw}, {0, 0, 1, 0}, {0, 1, 0, 0}, 
+                lanes, lanes, olc::Pixel( 220, 220,  220), false);
     }
 };
 
@@ -1027,6 +1038,10 @@ public:
         // Draw Hallway
         draw.SetModelMatrix(rot);
         draw.Mesh(olc::Structure::List, hall.mesh.pos, hall.mesh.col);
+        olc::Pixel gateColor = hall.GateOpen() ? olc::Colour::GREEN :
+            olc::Colour::RED ;
+        draw.Mesh(olc::Structure::List, hall.gateMesh.pos, 
+                hall.gateMesh.col, gateColor);
 
         // Draw Player Cube
         olc::mf4d tr, sc;
