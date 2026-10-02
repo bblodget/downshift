@@ -929,45 +929,55 @@ public:
         if (keyboard.GetKey(olc::Key::OEM_3).bPressed)
             showDebug = !showDebug;
 
-        if (keyboard.GetKey(olc::Key::Q).bPressed)
+        // Press R to restart
+        if (keyboard.GetKey(olc::Key::R).bPressed)
         {
-            cam.TurnYaw(PI);
-            facing = -facing;
+            levelComplete = false;
+            hall.LoadCoins();
+            ResetPlayer();
         }
 
-        if (keyboard.GetKey(olc::Key::K1).bPressed) player.Fall(Gravity::NegY);
-        if (keyboard.GetKey(olc::Key::K2).bPressed) player.Fall(Gravity::PosZ);
-        if (keyboard.GetKey(olc::Key::K3).bPressed) player.Fall(Gravity::PosY);
-        if (keyboard.GetKey(olc::Key::K4).bPressed) player.Fall(Gravity::NegZ);
-
-
-        // Check WASD only when grounded
-        if (player.motion != Motion::Lashing)
+        if (!levelComplete)
         {
-
-            olc::vf4d forward = Forward();
-
-            // Remove the velocity component along forward direction
-            player.velocity += forward * (-player.velocity.dot(forward));
-            if (keyboard.GetKey(olc::Key::W).bHeld) player.velocity += forward * moveSpeed;
-            if (keyboard.GetKey(olc::Key::S).bHeld) player.velocity += forward * -moveSpeed;
-
-            olc::vf4d surfaceUp = -GravityDirection(player.gravity);
-            olc::vf4d right_dir = surfaceUp.cross(forward);
-
-            // Remove only the velocity component along right_dir.
-            player.velocity += right_dir * (-player.velocity.dot(right_dir));
-
-            if (keyboard.GetKey(olc::Key::A).bHeld)
+            if (keyboard.GetKey(olc::Key::Q).bPressed)
             {
-                player.velocity += right_dir * -moveSpeed;
+                cam.TurnYaw(PI);
+                facing = -facing;
             }
-            if (keyboard.GetKey(olc::Key::D).bHeld)
-            {
-                player.velocity += right_dir * moveSpeed;
-            }
-        }
 
+            if (keyboard.GetKey(olc::Key::K1).bPressed) player.Fall(Gravity::NegY);
+            if (keyboard.GetKey(olc::Key::K2).bPressed) player.Fall(Gravity::PosZ);
+            if (keyboard.GetKey(olc::Key::K3).bPressed) player.Fall(Gravity::PosY);
+            if (keyboard.GetKey(olc::Key::K4).bPressed) player.Fall(Gravity::NegZ);
+
+
+            // Check WASD when not Lashing
+            if (player.motion != Motion::Lashing)
+            {
+
+                olc::vf4d forward = Forward();
+
+                // Remove the velocity component along forward direction
+                player.velocity += forward * (-player.velocity.dot(forward));
+                if (keyboard.GetKey(olc::Key::W).bHeld) player.velocity += forward * moveSpeed;
+                if (keyboard.GetKey(olc::Key::S).bHeld) player.velocity += forward * -moveSpeed;
+
+                olc::vf4d surfaceUp = -GravityDirection(player.gravity);
+                olc::vf4d right_dir = surfaceUp.cross(forward);
+
+                // Remove only the velocity component along right_dir.
+                player.velocity += right_dir * (-player.velocity.dot(right_dir));
+
+                if (keyboard.GetKey(olc::Key::A).bHeld)
+                {
+                    player.velocity += right_dir * -moveSpeed;
+                }
+                if (keyboard.GetKey(olc::Key::D).bHeld)
+                {
+                    player.velocity += right_dir * moveSpeed;
+                }
+            }
+        } 
 
         /************** Game State Update ****************/
 
@@ -1029,7 +1039,7 @@ public:
         LashInfo lash = CheckWalls(ray);
 
         bool newWall = lash.wall != player.gravity;
-        if (mouse.GetButton(0).bPressed && newWall && lash.hit)
+        if (!levelComplete && mouse.GetButton(0).bPressed && newWall && lash.hit)
         {
             // Check that the player is in the hall
             if (hall.Contains(player.pos))
