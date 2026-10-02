@@ -517,16 +517,23 @@ public:
         coin.pos.clear();
         coin.col.clear();
 
-        std::array<olc::vf4d, coinSides> front, back;
+        std::array<olc::vf4d, coinSides> in_front, in_back;
+        std::array<olc::vf4d, coinSides> out_front, out_back;
         float ht = thickness/2;     // the half width
         float angle = 2 * PI / coinSides;
+        float inner = r * 0.8f;
+        float outer = ht * 1.05;
 
         for (int i=0; i<coinSides; i++)
         {
-            float x = r * std::cos(i * angle);
-            float y = r * std::sin(i * angle);
-            front[i] = {x, y,  ht};
-            back[i]  = {x, y, -ht};
+            float xi = inner * std::cos(i * angle);
+            float yi = inner * std::sin(i * angle);
+            float xo = r * std::cos(i * angle);
+            float yo = r * std::sin(i * angle);
+            in_front[i] = {xi, yi,  ht};
+            in_back[i]  = {xi, yi, -ht};
+            out_front[i] = {xo, yo,  outer};
+            out_back[i]  = {xo, yo, -outer};
         }
 
         olc::vf4d fcenter = {0.0f, 0.0f, ht};
@@ -535,9 +542,16 @@ public:
         for (int i=0; i<coinSides; i++)
         {
             int j=(i+1)%coinSides;
-            Triangle(coin, fcenter, front[i], front[j], color);
-            Triangle(coin, bcenter, back[j], back[i], color);
-            Face(coin, front[j], front[i], back[i], back[j], color * 0.85f);
+            // Inner coin
+            Triangle(coin, fcenter, in_front[i], in_front[j], color);
+            Triangle(coin, bcenter, in_back[j], in_back[i], color);
+
+            // Outer coin
+            Face(coin, in_front[j], in_front[i], out_front[i], out_front[j], color * 0.8f);
+            Face(coin, in_back[i], in_back[j], out_back[j], out_back[i], color * 0.8f);
+
+            // Coin rim
+            Face(coin, out_front[j], out_front[i], out_back[i], out_back[j], color * 0.6f);
         }
     }
 
