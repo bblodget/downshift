@@ -914,7 +914,7 @@ public:
         if (keyboard.GetKey(olc::Key::ESCAPE).bPressed) return false;
 
         // Toggle debug HUD
-        if (keyboard.GetKey(olc::Key::F1).bPressed)
+        if (keyboard.GetKey(olc::Key::OEM_3).bPressed)
             showDebug = !showDebug;
 
         if (keyboard.GetKey(olc::Key::Q).bPressed)
@@ -1042,31 +1042,33 @@ public:
         DrawCoins(rot);
 
         // Draw Gravity Arrow
-        draw.SetModelMatrix(rot);
-        draw.EnableDepth(false);
-        draw.Line(player.pos, player.pos + (GravityDirection(player.gravity)*1.25f),
-                olc::Colour::TANGERINE, olc::Colour::TANGERINE);
-        draw.EnableDepth(true);
+        if (showDebug)
+        {
+            draw.SetModelMatrix(rot);
+            draw.EnableDepth(false);
+            draw.Line(player.pos, player.pos + (GravityDirection(player.gravity)*1.25f),
+                    olc::Colour::TANGERINE, olc::Colour::TANGERINE);
+            draw.EnableDepth(true);
+        }
 
         // Draw HUD
         draw.WorldReset();
 
+        std::ostringstream coinStr;
+        coinStr << "Coins: " << hall.CoinsCollected() << "/"
+            << hall.coins.size();
+        draw.String({2,2}, coinStr.str(), olc::Colour::YELLOW);
+
         if (showDebug)
         {
-            draw.String({ 2, 2 }, std::string("Gravity: ") + GravityName(player.gravity)
+            draw.String({ 2, 20 }, std::string("Gravity: ") + GravityName(player.gravity)
                     + "\nPosition: " + ToString(player.pos), olc::Colour::YELLOW);
             if (lash.hit)
             {
-                draw.String({2, 20}, "Hit Point: " + ToString(lash.hit_point) + "\n" +
+                draw.String({2, 40}, "Hit Point: " + ToString(lash.hit_point) + "\n" +
                         "Hit Floor: " + GravityName(lash.wall) + "\n"
                         ,olc::Colour::YELLOW);
             }
-        } else
-        { 
-            std::ostringstream coinStr;
-            coinStr << "Coins: " << hall.CoinsCollected() << "/"
-                << hall.coins.size();
-            draw.String({2,2}, coinStr.str(), olc::Colour::YELLOW);
         }
 
         // Successful frame
