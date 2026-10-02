@@ -34,8 +34,8 @@ constexpr float fallTime = 1.5f;  // Fall before respawn
 constexpr float spinSpeed = 2.0f; // rad/sec
 constexpr float spinAngle = (2.0f * PI)/spinSpeed;  // radians
 constexpr int coinSides = 12;
-constexpr float coinThickness = 0.075;
-constexpr float coinRadius = 0.25;
+constexpr float coinThickness = 0.075f;
+constexpr float coinRadius = 0.25f;
 constexpr olc::Pixel coinColor = olc::Pixel(255,200, 40);
 
 // Remove leading and trailing whitespace
@@ -83,21 +83,27 @@ constexpr Gravity allGravities[] =
 struct GravityInfo
 {
     olc::vf4d direction;
+    olc::vf4d leftDir;
     const char* name;
 };
 
 // The order matches the enum class Gravity
 const GravityInfo gravityTable[] =
 {
-    {{0.0f, -1.0f,  0.0f, 0.0f}, "floor"},
-    {{0.0f,  0.0f,  1.0f, 0.0f}, "left wall"},
-    {{0.0f,  1.0f,  0.0f, 0.0f}, "ceiling"},
-    {{0.0f,  0.0f, -1.0f, 0.0f}, "right wall"}
+    {{0.0f, -1.0f,  0.0f, 0.0f}, {0.0f,  0.0f,  1.0f, 0.0f}, "floor"},
+    {{0.0f,  0.0f,  1.0f, 0.0f}, {0.0f,  1.0f,  0.0f, 0.0f}, "left wall"},
+    {{0.0f,  1.0f,  0.0f, 0.0f}, {0.0f,  0.0f, -1.0f, 0.0f}, "ceiling"},
+    {{0.0f,  0.0f, -1.0f, 0.0f}, {0.0f, -1.0f,  0.0f, 0.0f}, "right wall"}
 };
 
 olc::vf4d GravityDirection(Gravity gravity)
 {
     return gravityTable[static_cast<int>(gravity)].direction;
+}
+
+olc::vf4d GravityLeftDir(Gravity gravity)
+{
+    return gravityTable[static_cast<int>(gravity)].leftDir;
 }
 
 const char* GravityName(Gravity gravity)
@@ -116,6 +122,13 @@ struct LashInfo
     bool hit;
     Gravity wall;
     olc::vf4d hit_point;
+};
+
+struct Coin 
+{
+    olc::vf4d pos = {0.0f, 0.0f, 0.0f, 1.0f};
+    Gravity surface = Gravity::NegY;
+    bool collected = false;
 };
 
 struct Body
@@ -221,6 +234,8 @@ struct Hall
     using Slice = std::array<std::string, 4>;
     std::vector<Slice> slices;
 
+    std::vector<Coin> coins;
+
     bool Contains(const olc::vf4d& pos) const
     {
         return (pos.x < length && pos.x > 0
@@ -247,27 +262,51 @@ struct Hall
         const auto& slice_row = slices.at(slice);
         const auto& surface_row = slice_row[static_cast<int>(surface)];
         auto tile_char = surface_row[lane];
-        return tile_char != '-';
+        return tile_char == '*' || tile_char == 'c';
     }
 
     bool IsSolidAt(Gravity surface, const olc::vf4d& pos) const
     {
-        olc::vf4d left_dir = {0.0f, 0.0f, 0.0f, 0.0f};
-        switch (surface)
-        {
-            case Gravity::NegY:  // Floor
-                left_dir.z =  1.0f; break;
-            case Gravity::PosZ:  // Left Wall
-                left_dir.y =  1.0f; break;
-            case Gravity::PosY:  // Ceiling
-                left_dir.z = -1.0f; break;
-            case Gravity::NegZ:  // Right Wall
-                left_dir.y = -1.0f; break;
-        }
+        olc::vf4d left_dir = GravityLeftDir(surface); 
         int slice = static_cast<int>(std::floor(pos.x));
         int lane = static_cast<int>(std::floor(HalfWidth() - pos.dot(left_dir)));
 
         return IsSolid(surface, slice, lane);
+    }
+
+    void LoadCoins()
+    {
+        constexpr float lift = coinRadius + 0.05f;
+        coins.clear();
+        int slice_num = 0;
+
+        // Loop through all the hall slices
+        for (const Slice& s : slices)
+        {
+            // Loop through all the gravities
+            for (Gravity gravity : allGravities)
+            {
+                int i = static_cast<int>(gravity);
+                olc::vf4d g = GravityDirection(gravity);
+                olc::vf4d lg = GravityLeftDir(gravity);
+
+                // Check the slice for coins
+                for (auto p = s[i].find_first_of("co");
+                        p != std::string::npos;
+                        p = s[i].find_first_of("co", p + 1))
+                {
+                    // Create a coin at this slice index (p)
+                    Coin coin;
+                    coin.surface = gravity;
+                    coin.pos.x = slice_num + 0.5f;
+                    coin.pos += g *(HalfWidth() - lift);
+                    coin.pos += lg * (HalfWidth() - 0.5f 
+                            - static_cast<float>(p));
+                    coins.push_back(coin);
+                }
+            }
+            slice_num++;
+        }
     }
 
     bool Load(const std::string& path)
@@ -442,7 +481,7 @@ struct Hall
                 << ": Error: Invalid start.lane." << std::endl;
             return false;
         }
-       
+        LoadCoins();
         return true;
     }
 
