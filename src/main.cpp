@@ -573,6 +573,7 @@ public:
     float outTime = 0.0f;
     float elapsedTime = 0.0f;
     bool showDebug = false;
+    bool levelComplete = false;
 
     void CollectCoins()
     {
@@ -971,8 +972,18 @@ public:
         /************** Game State Update ****************/
 
         // Update player
-        BodyUpdate(player, dt);
+        if (!levelComplete)
+        {
+            BodyUpdate(player, dt);
+        }
         CollectCoins();
+
+        // Check the Gate
+        if (hall.GateOpen() && player.pos.x >=
+                hall.length - player.halfSize.x - tolerance) 
+        {
+            levelComplete = true;
+        }
 
         // Out of bounds check
         if (!hall.Contains(player.pos)) 
@@ -1073,6 +1084,10 @@ public:
         coinStr << "Coins: " << hall.CoinsCollected() << "/"
             << hall.coins.size();
         draw.String({2,2}, coinStr.str(), olc::Colour::YELLOW);
+        if (levelComplete)
+        {
+            draw.String({2,10}, "Level Complete!", olc::Colour::YELLOW);
+        }
 
         if (showDebug)
         {
