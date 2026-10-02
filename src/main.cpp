@@ -37,6 +37,7 @@ constexpr int coinSides = 12;
 constexpr float coinThickness = 0.075f;
 constexpr float coinRadius = 0.25f;
 constexpr olc::Pixel coinColor = olc::Pixel(255,200, 40);
+constexpr float pickupRadius = 0.65f;
 
 // Remove leading and trailing whitespace
 std::string Trim(const std::string& text)
@@ -235,6 +236,17 @@ struct Hall
     std::vector<Slice> slices;
 
     std::vector<Coin> coins;
+
+    int CoinsCollected() const
+    {
+        int count = 0;
+        for (const Coin& coin : coins)
+        {
+            if (coin.collected)
+                count++;
+        }
+        return count;
+    }
 
     bool Contains(const olc::vf4d& pos) const
     {
@@ -549,6 +561,23 @@ public:
     olc::utils::Camera3D::Ray ray;
     float outTime = 0.0f;
     float elapsedTime = 0.0f;
+    bool showDebug = false;
+
+    void CollectCoins()
+    {
+        for (Coin& coin : hall.coins)
+        {
+            // skip collected coins
+            if (coin.collected)
+                continue;
+
+            // Check if we are close to the coin
+            if ((player.pos - coin.pos).mag() < pickupRadius)
+            {
+                coin.collected = true;
+            }
+        }
+    }
 
     void DrawCoins(const olc::mf4d& rot)
     {
@@ -884,6 +913,10 @@ public:
         // Escape quits the game
         if (keyboard.GetKey(olc::Key::ESCAPE).bPressed) return false;
 
+        // Toggle debug HUD
+        if (keyboard.GetKey(olc::Key::F1).bPressed)
+            showDebug = !showDebug;
+
         if (keyboard.GetKey(olc::Key::Q).bPressed)
         {
             cam.TurnYaw(PI);
@@ -928,6 +961,7 @@ public:
 
         // Update player
         BodyUpdate(player, dt);
+        CollectCoins();
 
         // Out of bounds check
         if (!hall.Contains(player.pos)) 
@@ -1016,13 +1050,23 @@ public:
 
         // Draw HUD
         draw.WorldReset();
-		draw.String({ 2, 2 }, std::string("Gravity: ") + GravityName(player.gravity)
-                + "\nPosition: " + ToString(player.pos), olc::Colour::YELLOW);
-        if (lash.hit)
+
+        if (showDebug)
         {
-            draw.String({2, 20}, "Hit Point: " + ToString(lash.hit_point) + "\n" +
-                    "Hit Floor: " + GravityName(lash.wall) + "\n"
-                    ,olc::Colour::YELLOW);
+            draw.String({ 2, 2 }, std::string("Gravity: ") + GravityName(player.gravity)
+                    + "\nPosition: " + ToString(player.pos), olc::Colour::YELLOW);
+            if (lash.hit)
+            {
+                draw.String({2, 20}, "Hit Point: " + ToString(lash.hit_point) + "\n" +
+                        "Hit Floor: " + GravityName(lash.wall) + "\n"
+                        ,olc::Colour::YELLOW);
+            }
+        } else
+        { 
+            std::ostringstream coinStr;
+            coinStr << "Coins: " << hall.CoinsCollected() << "/"
+                << hall.coins.size();
+            draw.String({2,2}, coinStr.str(), olc::Colour::YELLOW);
         }
 
         // Successful frame
