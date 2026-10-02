@@ -541,7 +541,7 @@ public:
     Hall hall;
     Mesh cube;
     Mesh crystal;
-    Mesh coin;
+    Mesh coinMesh;
     olc::utils::Camera3D    cam;
     Body player;
     float roll = 0.0f;
@@ -550,18 +550,41 @@ public:
     float outTime = 0.0f;
     float elapsedTime = 0.0f;
 
+    void DrawCoins(const olc::mf4d& rot)
+    {
+        for (const Coin& coin : hall.coins)
+        {
+            // skip collected coins
+            if (coin.collected)
+                continue;
+
+            olc::mf4d ctr;
+            ctr.translate(coin.pos);
+
+            olc::mf4d surfaceRot;
+            surfaceRot.rotateX(
+                -static_cast<int>(coin.surface) * PI / 2.0f);
+
+            olc::mf4d crot;
+            crot.rotateY(elapsedTime * spinSpeed);
+
+            draw.SetModelMatrix(rot * ctr * surfaceRot * crot);
+            draw.Mesh(olc::Structure::List, coinMesh.pos, coinMesh.col);
+        }
+    }
+
     void BuildCoinMesh(float thickness, float r, olc::Pixel color)
     {
         // Empty the coin mesh before building
-        coin.pos.clear();
-        coin.col.clear();
+        coinMesh.pos.clear();
+        coinMesh.col.clear();
 
         std::array<olc::vf4d, coinSides> in_front, in_back;
         std::array<olc::vf4d, coinSides> out_front, out_back;
         float ht = thickness/2;     // the half width
         float angle = 2 * PI / coinSides;
         float inner = r * 0.8f;
-        float outer = ht * 1.05;
+        float outer = ht * 1.05f;
 
         for (int i=0; i<coinSides; i++)
         {
@@ -581,16 +604,16 @@ public:
         for (int i=0; i<coinSides; i++)
         {
             int j=(i+1)%coinSides;
-            // Inner coin
-            Triangle(coin, fcenter, in_front[i], in_front[j], color);
-            Triangle(coin, bcenter, in_back[j], in_back[i], color);
+            // Inner coinMesh
+            Triangle(coinMesh, fcenter, in_front[i], in_front[j], color);
+            Triangle(coinMesh, bcenter, in_back[j], in_back[i], color);
 
-            // Outer coin
-            Face(coin, in_front[j], in_front[i], out_front[i], out_front[j], color * 0.8f);
-            Face(coin, in_back[i], in_back[j], out_back[j], out_back[i], color * 0.8f);
+            // Outer coinMesh
+            Face(coinMesh, in_front[j], in_front[i], out_front[i], out_front[j], color * 0.8f);
+            Face(coinMesh, in_back[i], in_back[j], out_back[j], out_back[i], color * 0.8f);
 
             // Coin rim
-            Face(coin, out_front[j], out_front[i], out_back[i], out_back[j], color * 0.6f);
+            Face(coinMesh, out_front[j], out_front[i], out_back[i], out_back[j], color * 0.6f);
         }
     }
 
@@ -982,15 +1005,7 @@ public:
         draw.Mesh(olc::Structure::List, player.mesh->pos, player.mesh->col, player.tint);
 
         // Draw Coin
-        // olc::vf4d crystalPos = {5.0f, -1.0f, 0.0f};
-        olc::vf4d coinPos = {5.0f, -1.0f, 0.0f};
-
-        olc::mf4d ctr;
-        ctr.translate(coinPos);
-        olc::mf4d crot;
-        crot.rotateY(elapsedTime * spinSpeed);
-        draw.SetModelMatrix(rot * ctr * crot);
-        draw.Mesh(olc::Structure::List, coin.pos, coin.col);
+        DrawCoins(rot);
 
         // Draw Gravity Arrow
         draw.SetModelMatrix(rot);
