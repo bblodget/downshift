@@ -837,9 +837,10 @@ public:
         body.pos += body.velocity * dt;
 
         float max_value = hall.length - body.halfSize.x;
-        float min_value = -10.0f;  // allow walking off the uncapped end.
+        float min_value = body.halfSize.x;
+        // min_solid is false. open back: no start wall
         ClampToSurface(body, {1.0f, 0.0f, 0.0f, 0.0f}, min_value, max_value,
-                true, true, prev_body_pos);
+                false, true, prev_body_pos);
 
         max_value = (hall.HalfWidth()-body.halfSize.y);
         min_value = -max_value;
@@ -883,7 +884,7 @@ public:
 
         float eyeX = cam_target.x - offsetX;
         // Allow eye to be out the back
-        eyeX = std::clamp(eyeX, -10.0f, float(hall.length) - margin);
+        eyeX = std::min(eyeX, float(hall.length) - margin);
 
         cam_target.x = eyeX + offsetX;
         cam.SetTarget(cam_target);
