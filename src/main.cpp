@@ -39,6 +39,7 @@ constexpr float coinThickness = 0.075f;
 constexpr float coinRadius = 0.25f;
 constexpr olc::Pixel coinColor = olc::Pixel(255,200, 40);
 constexpr float pickupRadius = 0.65f;
+constexpr float jumpSpeed = 10.0f; 
 
 // Remove leading and trailing whitespace
 std::string Trim(const std::string& text)
@@ -96,6 +97,16 @@ const GravityInfo gravityTable[] =
     {{0.0f,  0.0f,  1.0f, 0.0f}, {0.0f,  1.0f,  0.0f, 0.0f}, "left wall"},
     {{0.0f,  1.0f,  0.0f, 0.0f}, {0.0f,  0.0f, -1.0f, 0.0f}, "ceiling"},
     {{0.0f,  0.0f, -1.0f, 0.0f}, {0.0f, -1.0f,  0.0f, 0.0f}, "right wall"}
+};
+
+// Level Data
+const std::string levelFiles[] =
+{
+    "./assets/levels/level01.txt",
+    "./assets/levels/level02.txt",
+    "./assets/levels/level03.txt",
+    "./assets/levels/level04.txt",
+    "./assets/levels/level05.txt",
 };
 
 olc::vf4d GravityDirection(Gravity gravity)
@@ -166,6 +177,13 @@ struct Body
     void Fall(Gravity wall)
     {
         SetGravity(wall);
+        motion = Motion::Falling;
+    }
+
+    void Jump()
+    {
+        olc::vf4d surfaceUp = -GravityDirection(gravity);
+        velocity += surfaceUp * jumpSpeed;
         motion = Motion::Falling;
     }
 
@@ -578,6 +596,28 @@ public:
     bool levelComplete = false;
     bool levelStart = false;
     std::string completionComment = "How did this get here?";
+    int levelIndex = 0;
+
+    bool LoadLevel(int index)
+    {
+        if (index >= static_cast<int>(std::size(levelFiles))
+                || index < 0)
+        {
+            return false;
+        }
+        Hall tmpHall;
+        if (tmpHall.Load(levelFiles[index]))
+        {
+            hall = std::move(tmpHall);
+            hall.Build();
+            ResetLevel();
+            levelIndex = index;
+            return true;
+        }
+        // Load failed so restart previous working level
+        ResetLevel();
+        return false;
+    }
 
     std::string CompletionComment(bool beatPar)
     {
@@ -922,15 +962,20 @@ public:
     // Called once at the start, so create things here
     bool OnUserCreate() override
     {
+        // Setup Camera
+        cam.SetPerspective(75.0f * PI / 180.0f, float(ScreenSize().x) / ScreenSize().y, 0.1f, 100.0f);
+        cam.SetDistance(3.0f);          // distance in units
+        cam.SetPitch(PI/18);            // Look down at 10 degrees.
+        cam.SetYawEaseRate(5.0f);
+
         // Build the Hall
-        if (!hall.Load("./assets/levels/level01.txt"))
+        if (!LoadLevel(0))
         {
             return false;
         }
-        hall.Build();
 
         // Build the crystal mesh
-        BuildCrystalMesh(0.35f, 0.2f, olc::Colour::YELLOW);
+        // XXX BuildCrystalMesh(0.35f, 0.2f, olc::Colour::YELLOW);
 
         // Build the coin mesh
         BuildCoinMesh(coinThickness, coinRadius, coinColor);
@@ -938,14 +983,6 @@ public:
         // Build the player
         BuildCubeMesh();
         player.mesh = &cube;
-
-        cam.SetPerspective(75.0f * PI / 180.0f, float(ScreenSize().x) / ScreenSize().y, 0.1f, 100.0f);
-        cam.SetDistance(3.0f);          // distance in units
-        cam.SetPitch(PI/18);            // Look down at 10 degrees.
-        cam.SetYawEaseRate(5.0f);
-
-        // Reset Level
-        ResetLevel();
 
         return true;
     }
@@ -974,7 +1011,8 @@ public:
         // Press R to restart
         if (keyboard.GetKey(olc::Key::R).bPressed)
         {
-            ResetLevel();
+            //ResetLevel();
+            LoadLevel(levelIndex);
         }
 
         if (!levelComplete)
@@ -990,6 +1028,14 @@ public:
             if (keyboard.GetKey(olc::Key::K3).bPressed) player.Fall(Gravity::PosY);
             if (keyboard.GetKey(olc::Key::K4).bPressed) player.Fall(Gravity::NegZ);
 
+            // Check Spacebar for jump
+            if (player.motion == Motion::Grounded)
+            {
+                if (keyboard.GetKey(olc::Key::SPACE).bPressed)
+                {
+                    player.Jump();
+                }
+            }
 
             // Check WASD when not Lashing
             if (player.motion != Motion::Lashing)
