@@ -40,7 +40,7 @@ constexpr float coinRadius = 0.25f;
 constexpr olc::Pixel coinColor = olc::Pixel(255,200, 40);
 constexpr float pickupRadius = 0.65f;
 constexpr float jumpSpeed = 12.0f; 
-constexpr float lift = coinRadius + 0.50f;
+constexpr float lift = coinRadius + 0.60f;
 
 // Remove leading and trailing whitespace
 std::string Trim(const std::string& text)
