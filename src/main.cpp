@@ -627,13 +627,15 @@ public:
     int levelIndex = 0;
     GameState gameState = GameState::Intro;
 
-    void DrawPanel(const std::vector<std::string>& lines)
+    void DrawPanel(const std::vector<std::string>& lines,
+            olc::Pixel color = olc::Colour::YELLOW)
     {
         if (lines.empty())
             return;
 
-        std::string text = "Downshift\n";
-        text += "\n";
+        const std::string title = "Downshift";
+        const vf2d titleScale = {1.2f, 1.2f};
+        std::string text = "\n\n";
 
         if (gameState == GameState::Intro)
         {
@@ -662,12 +664,14 @@ public:
         }
 
         const float padding = 8.0f;
+
+        const auto titleSize = draw.GetTextSize(title, false, titleScale);
         const auto textSize = draw.GetTextSize(text);
 
         olc::vf2d panelSize 
         {
-            textSize.x + padding * 2,
-            textSize.y + padding * 2
+            std::max(textSize.x, titleSize.x) + padding * 2,
+            titleSize.y + textSize.y + padding * 2
         };
 
         olc::vf2d origin
@@ -676,13 +680,25 @@ public:
             (ScreenSize().y - panelSize.y) * 0.5f
         };
 
+        olc::vf2d textOrgin
+        {
+            origin.x + padding,
+            origin.y + padding
+        };
+
+
         // TODO: Draw background and border using origin and panelSize.
         draw.FilledRoundedRect(origin, panelSize, 10.0f, olc::Pixel(16, 16, 16, 192));
 
+        // Remove the title's characters, preserving its line and spacing.
+        //
         draw.String(
                 {origin.x + padding, origin.y + padding},
-                text,
-                olc::Colour::YELLOW);
+                title, color, titleScale);
+
+        draw.String(
+                {origin.x + padding, origin.y + titleSize.y +  padding},
+                text, color);
     }
 
     bool LastLevel()
