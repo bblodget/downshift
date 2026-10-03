@@ -1,0 +1,58 @@
+name = Chasm Crossing
+par = 35
+
+text =
+This one is a little tricky.
+You need to lash across the chasm,
+to get the change.
+
+left click: to lash to a wall
+WASD:       to move.
+Q:          to turn 180
+Space:      to jump
+R:          restart the level
+Esc:   quits game
+endtext
+
+# start slice lane
+# slice and lane first index is 0.
+# slice is distance down the hall
+# lane is tile center from left wall
+start = 2 1.5
+
+# floor  left   ceil   right
+  ****   ****   ****   ****
+  ****   ****   ****   ****
+  ****   ****   ****   ****
+  ****   ****   ****   ****
+  ****   ****   ****   ****
+
+  ****   ****   ****   ****
+  ****   ****   ****   ****
+  *c**   ****   ****   ****
+  ****   ****   ****   ****
+  ****   ****   ****   ****
+
+  ----   ****   ----   ----
+  ----   ****   ----   ----
+  ----   ****   -o--   ----
+  ----   ****   ----   ----
+  ----   ****   ----   ----
+
+  ----   ----   ****   ----
+  ----   ----   ****   ----
+  -o--   ----   ****   ----
+  ----   ----   ****   ----
+  ----   ----   ****   ----
+
+  ****   ****   ****   ****
+  ****   ****   ****   ****
+  ****   **c*   ****   ****
+  ****   ****   ****   ****
+  ****   ****   ****   ****
+
+  ****   ****   ****   ****
+  ****   ****   ****   ****
+  ****   ****   ****   ****
+  ****   ****   ****   *c**
+  ****   ****   ****   ****

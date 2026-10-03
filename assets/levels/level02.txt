@@ -11,7 +11,7 @@ WASD:       to move.
 Q:          to turn 180
 Space:      to jump
 R:          restart the level
-Esc:   quits game
+Esc:        quits game
 endtext
 
 # start slice lane
