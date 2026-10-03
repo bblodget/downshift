@@ -38,7 +38,7 @@ constexpr int coinSides = 12;
 constexpr float coinThickness = 0.075f;
 constexpr float coinRadius = 0.25f;
 constexpr olc::Pixel coinColor = olc::Pixel(255,200, 40);
-constexpr float pickupRadius = 0.65f;
+constexpr float pickupRadius = 0.85f;
 constexpr float jumpSpeed = 12.0f; 
 constexpr float lift = coinRadius + 0.60f;
 
@@ -632,12 +632,34 @@ public:
         if (lines.empty())
             return;
 
-        std::string text;
+        std::string text = "Downshift\n";
+        text += "\n";
+
+        if (gameState == GameState::Intro)
+        {
+            text += "Level " + std::to_string(levelIndex+1) + ": ";
+            text += hall.name + '\n';
+            text += "Par time: " + std::to_string(int(hall.parTime))
+                + " seconds \n";
+            text += "\n";
+        }
+
         for (const auto& line : lines)
         {
             text += line + '\n';
         }
-        text += "\nPress spacebar to continue";
+        if (gameState == GameState::End)
+        {
+            text += "\nPress spacebar to play again";
+        }
+        else
+        {
+            text += "\nPress spacebar to continue";
+            if (gameState == GameState::Complete)
+            {
+                text += "\nPress R to replay this level";
+            }
+        }
 
         const float padding = 8.0f;
         const auto textSize = draw.GetTextSize(text);
@@ -654,7 +676,8 @@ public:
             (ScreenSize().y - panelSize.y) * 0.5f
         };
 
-        // TODO: Draw background and border using orgin and panelSize.
+        // TODO: Draw background and border using origin and panelSize.
+        draw.FilledRoundedRect(origin, panelSize, 10.0f, olc::Pixel(16, 16, 16, 192));
 
         draw.String(
                 {origin.x + padding, origin.y + padding},
@@ -1296,7 +1319,8 @@ public:
 
         std::ostringstream coinStr;
         coinStr << "Coins: " << hall.CoinsCollected() << "/"
-            << hall.coins.size();
+            << hall.coins.size() << "\n"
+            "Level: " << levelIndex + 1;
         draw.String({2,2}, coinStr.str(), olc::Colour::YELLOW);
 
         std::ostringstream timeStr;
@@ -1340,8 +1364,6 @@ public:
                 "Congratulations!",
                 "",
                 "You completed the game!",
-                "",
-                "Press spacebar to play again"
             });
         }
 

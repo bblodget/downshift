@@ -4,7 +4,7 @@ text =
 Collect all the change to turn
 the end gate from red to green.
 Touch the green gate to complete
-the level.  Can you beet the par time?
+the level.  Can you beat the par time?
 
 WASD:  to move.
 Q:     to turn 180
@@ -21,7 +21,8 @@ par = 10
 # lane is tile center from left wall
 start = 1 3
 
-# floor     left        ceil        right
+# floor      left        ceil       right
+# gray       blue        white      purple
   ********   --------   --------   --------
   ********   --------   --------   --------
   ********   --------   --------   --------
