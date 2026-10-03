@@ -114,6 +114,8 @@ const std::string levelFiles[] =
 {
     "./assets/levels/level01.txt",
     "./assets/levels/level02.txt",
+    "./assets/levels/level03.txt",
+    "./assets/levels/level04.txt",
 };
 
 olc::vf4d GravityDirection(Gravity gravity)
@@ -660,6 +662,10 @@ public:
         }
         else
         {
+            if (gameState == GameState::Intro)
+            {
+                text += "\nPress N to skip to next level";
+            }
             text += "\nPress spacebar to continue";
             if (gameState == GameState::Complete)
             {
@@ -1136,6 +1142,11 @@ public:
                 if (keyboard.GetKey(olc::Key::SPACE).bPressed)
                 {
                     gameState = GameState::Playing;
+                }
+                if (keyboard.GetKey(olc::Key::N).bPressed)
+                {
+                    // Allow skipping to next level
+                    LoadLevel((levelIndex + 1) % static_cast<int>(std::size(levelFiles)));
                 }
                 break;
             }
