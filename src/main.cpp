@@ -39,7 +39,8 @@ constexpr float coinThickness = 0.075f;
 constexpr float coinRadius = 0.25f;
 constexpr olc::Pixel coinColor = olc::Pixel(255,200, 40);
 constexpr float pickupRadius = 0.65f;
-constexpr float jumpSpeed = 10.0f; 
+constexpr float jumpSpeed = 12.0f; 
+constexpr float lift = coinRadius + 0.50f;
 
 // Remove leading and trailing whitespace
 std::string Trim(const std::string& text)
@@ -314,7 +315,6 @@ struct Hall
 
     void LoadCoins()
     {
-        constexpr float lift = coinRadius + 0.05f;
         coins.clear();
         int slice_num = 0;
 
@@ -526,7 +526,6 @@ struct Hall
 
     void Build()
     {
-        float xw = 0.0f;            // x west pos
         float xe = (float)length;  // x east pos
         float hw = HalfWidth();    
 
@@ -560,10 +559,6 @@ struct Hall
                 [&](int i, int j)
                 { return IsSolid(Gravity::NegZ, i, j); }
                 );
-
-        // Draw End of Tunnel, -X West
-        Wall(mesh, {xw,-hw, -hw}, {0, 0, 1, 0}, {0, 1, 0, 0}, 
-                lanes, lanes, olc::Pixel( 150, 150,  60), true);
 
         // Draw the Gate!
         // Draw End of Tunnel, +X East
@@ -842,7 +837,7 @@ public:
         body.pos += body.velocity * dt;
 
         float max_value = hall.length - body.halfSize.x;
-        float min_value = body.halfSize.x;
+        float min_value = -10.0f;  // allow walking off the uncapped end.
         ClampToSurface(body, {1.0f, 0.0f, 0.0f, 0.0f}, min_value, max_value,
                 true, true, prev_body_pos);
 
@@ -887,7 +882,8 @@ public:
             forward.x * cam.GetDistance() * std::cos(cam.GetPitch());
 
         float eyeX = cam_target.x - offsetX;
-        eyeX = std::clamp(eyeX, margin, float(hall.length) - margin);
+        // Allow eye to be out the back
+        eyeX = std::clamp(eyeX, -10.0f, float(hall.length) - margin);
 
         cam_target.x = eyeX + offsetX;
         cam.SetTarget(cam_target);
