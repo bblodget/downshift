@@ -41,6 +41,7 @@ constexpr olc::Pixel coinColor = olc::Pixel(255,200, 40);
 constexpr float pickupRadius = 0.85f;
 constexpr float jumpSpeed = 12.0f; 
 constexpr float lift = coinRadius + 0.60f;
+constexpr float coyoteTime = 0.12f;
 
 // Remove leading and trailing whitespace
 std::string Trim(const std::string& text)
@@ -156,6 +157,7 @@ struct Body
     olc::vf4d velocity  {0.0f, 0.0f, 0.0f, 0.0f};
     olc::vf4d halfSize  {0.4f, 0.4f, 0.4f, 0.0f};  // half size
     olc::Pixel tint = olc::Colour::WHITE;
+    float coyoteTimer = coyoteTime;
 
     Gravity gravity = Gravity::NegY;
     const Mesh* mesh = nullptr;
@@ -177,6 +179,7 @@ struct Body
 
     void Land()
     {
+        coyoteTimer = coyoteTime;
         motion = Motion::Grounded;
     }
 
@@ -191,6 +194,7 @@ struct Body
         olc::vf4d surfaceUp = -GravityDirection(gravity);
         velocity += surfaceUp * jumpSpeed;
         motion = Motion::Falling;
+        coyoteTimer = 0.0f;
     }
 
 
@@ -1063,6 +1067,7 @@ public:
                       -hall.HalfWidth() + player.halfSize.y,
                       (hall.HalfWidth() - 0.5f) - hall.start.lane };
 
+        player.Land();
         cam.SetYaw(-PI/2);              // turned so we down X axis
         SetCameraTarget(olc::mf4d());
 
@@ -1171,10 +1176,16 @@ public:
                 if (keyboard.GetKey(olc::Key::K4).bPressed) player.Fall(Gravity::NegZ);
 
                 // Check Spacebar for jump
-                if (player.motion == Motion::Grounded)
+                if (player.motion == Motion::Grounded 
+                        || (player.motion == Motion::Falling &&
+                            player.coyoteTimer > 0.0f))
                 {
                     if (keyboard.GetKey(olc::Key::SPACE).bPressed)
                     {
+                        if (showDebug && player.motion != Motion::Grounded)
+                        {
+                            std::cout << "CoyoteTime! " << player.coyoteTimer << std::endl;
+                        }
                         player.Jump();
                     }
                 }
@@ -1227,6 +1238,10 @@ public:
         {
             BodyUpdate(player, dt);
             CollectCoins();
+            if (player.motion == Motion::Falling)
+            {
+                player.coyoteTimer -= dt;
+            }
         }
 
         // Check the Gate
