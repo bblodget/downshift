@@ -62,6 +62,14 @@ std::string ToString(const olc::vf4d& v)
     return out.str();
 }
 
+enum class GameState
+{
+    Intro = 0,
+    Playing = 1,
+    Complete = 2,
+    End = 3
+};
+
 enum class Motion 
 {
     Grounded = 0,
@@ -105,9 +113,6 @@ const std::string levelFiles[] =
 {
     "./assets/levels/level01.txt",
     "./assets/levels/level02.txt",
-    "./assets/levels/level03.txt",
-    "./assets/levels/level04.txt",
-    "./assets/levels/level05.txt",
 };
 
 olc::vf4d GravityDirection(Gravity gravity)
@@ -257,6 +262,7 @@ struct Hall
     std::vector<Slice> slices;
 
     std::vector<Coin> coins;
+    std::vector<std::string> levelText;
 
     bool GateOpen() const
     {
@@ -353,6 +359,7 @@ struct Hall
         bool isName = false;
         bool isPar = false;
         bool isStart = false;
+        bool isText = false;
         int lineno = 0;
 
         // Reset member variables
@@ -362,6 +369,7 @@ struct Hall
         parTime = 0.0f;
         start = {0, 0};
         slices.clear();
+        levelText.clear();
 
         auto pos = path.find_last_of("/\\");
         std::string filename =
@@ -434,6 +442,26 @@ struct Hall
                     start.lane = lane;
                     isStart = true;
                 }
+                else if (key == "text")
+                {
+                    bool endtextFound = false;
+                    while (std::getline(file, line))
+                    {
+                        if (line.starts_with("endtext"))
+                        {
+                            endtextFound = true;
+                            break;
+                        }
+                        levelText.push_back(line);
+                    }
+                    if (!endtextFound)
+                    {
+                        std::cerr << filename << ":" << lineno 
+                            << ": Error endtext not found =" << std::endl;
+                        return false;
+                    }
+                    isText = true;
+                }
             } else {
                 // Handle the map lines
                 std::istringstream parser(line);
@@ -505,6 +533,12 @@ struct Hall
         {
             std::cerr << filename
                 << ": Error: No Start tile info specified." << std::endl;
+            return false;
+        }
+        if (!isText)
+        {
+            std::cerr << filename
+                << ": Error: No text section found." << std::endl;
             return false;
         }
         if (start.slice < 0.0f || start.slice > (length - 1))
@@ -588,10 +622,50 @@ public:
     float spinTime = 0.0f;
     float levelTime = 0.0f;
     bool showDebug = false;
-    bool levelComplete = false;
     bool levelStart = false;
     std::string completionComment = "How did this get here?";
     int levelIndex = 0;
+    GameState gameState = GameState::Intro;
+
+    void DrawPanel(const std::vector<std::string>& lines)
+    {
+        if (lines.empty())
+            return;
+
+        std::string text;
+        for (const auto& line : lines)
+        {
+            text += line + '\n';
+        }
+        text += "\nPress spacebar to continue";
+
+        const float padding = 8.0f;
+        const auto textSize = draw.GetTextSize(text);
+
+        olc::vf2d panelSize 
+        {
+            textSize.x + padding * 2,
+            textSize.y + padding * 2
+        };
+
+        olc::vf2d origin
+        {
+            (ScreenSize().x - panelSize.x) * 0.5f,
+            (ScreenSize().y - panelSize.y) * 0.5f
+        };
+
+        // TODO: Draw background and border using orgin and panelSize.
+
+        draw.String(
+                {origin.x + padding, origin.y + padding},
+                text,
+                olc::Colour::YELLOW);
+    }
+
+    bool LastLevel()
+    {
+        return levelIndex == static_cast<int>(std::size(levelFiles))-1;
+    }
 
     bool LoadLevel(int index)
     {
@@ -932,7 +1006,7 @@ public:
     {
         levelTime = 0.0f;
         levelStart = false;
-        levelComplete = false;
+        gameState = GameState::Intro;
         hall.LoadCoins();
         ResetPlayer();
     }
@@ -991,7 +1065,7 @@ public:
         dt =std::min(dt, 1.0f / 30.0f);
         spinTime = std::fmod(spinTime + dt, spinAngle);
 
-        if (levelStart && !levelComplete)
+        if (levelStart && gameState == GameState::Playing)
         {
             levelTime += dt;
         }
@@ -1008,59 +1082,93 @@ public:
         // Press R to restart
         if (keyboard.GetKey(olc::Key::R).bPressed)
         {
-            //ResetLevel();
             LoadLevel(levelIndex);
         }
 
-        if (!levelComplete)
+        switch (gameState)
         {
-            if (keyboard.GetKey(olc::Key::Q).bPressed)
-            {
-                cam.TurnYaw(PI);
-                facing = -facing;
-            }
-
-            if (keyboard.GetKey(olc::Key::K1).bPressed) player.Fall(Gravity::NegY);
-            if (keyboard.GetKey(olc::Key::K2).bPressed) player.Fall(Gravity::PosZ);
-            if (keyboard.GetKey(olc::Key::K3).bPressed) player.Fall(Gravity::PosY);
-            if (keyboard.GetKey(olc::Key::K4).bPressed) player.Fall(Gravity::NegZ);
-
-            // Check Spacebar for jump
-            if (player.motion == Motion::Grounded)
+            case GameState::Intro:
             {
                 if (keyboard.GetKey(olc::Key::SPACE).bPressed)
                 {
-                    player.Jump();
+                    gameState = GameState::Playing;
                 }
+                break;
             }
-
-            // Check WASD when not Lashing
-            if (player.motion != Motion::Lashing)
+            case GameState::Complete:
             {
-
-                olc::vf4d forward = Forward();
-
-                // Remove the velocity component along forward direction
-                player.velocity += forward * (-player.velocity.dot(forward));
-                if (keyboard.GetKey(olc::Key::W).bHeld) player.velocity += forward * moveSpeed;
-                if (keyboard.GetKey(olc::Key::S).bHeld) player.velocity += forward * -moveSpeed;
-
-                olc::vf4d surfaceUp = -GravityDirection(player.gravity);
-                olc::vf4d right_dir = surfaceUp.cross(forward);
-
-                // Remove only the velocity component along right_dir.
-                player.velocity += right_dir * (-player.velocity.dot(right_dir));
-
-                if (keyboard.GetKey(olc::Key::A).bHeld)
+                if (keyboard.GetKey(olc::Key::SPACE).bPressed)
                 {
-                    player.velocity += right_dir * -moveSpeed;
+                    if (LastLevel())
+                    {
+                        gameState = GameState::End;
+                    }
+                    else
+                    {
+                        LoadLevel(levelIndex + 1);
+                    }
                 }
-                if (keyboard.GetKey(olc::Key::D).bHeld)
-                {
-                    player.velocity += right_dir * moveSpeed;
-                }
+                break;
             }
-        } 
+            case GameState::End:
+            {
+                if (keyboard.GetKey(olc::Key::SPACE).bPressed)
+                {
+                    LoadLevel(0);
+                }
+                break;
+            }
+            case GameState::Playing:
+            {
+                if (keyboard.GetKey(olc::Key::Q).bPressed)
+                {
+                    cam.TurnYaw(PI);
+                    facing = -facing;
+                }
+
+                if (keyboard.GetKey(olc::Key::K1).bPressed) player.Fall(Gravity::NegY);
+                if (keyboard.GetKey(olc::Key::K2).bPressed) player.Fall(Gravity::PosZ);
+                if (keyboard.GetKey(olc::Key::K3).bPressed) player.Fall(Gravity::PosY);
+                if (keyboard.GetKey(olc::Key::K4).bPressed) player.Fall(Gravity::NegZ);
+
+                // Check Spacebar for jump
+                if (player.motion == Motion::Grounded)
+                {
+                    if (keyboard.GetKey(olc::Key::SPACE).bPressed)
+                    {
+                        player.Jump();
+                    }
+                }
+
+                // Check WASD when not Lashing
+                if (player.motion != Motion::Lashing)
+                {
+
+                    olc::vf4d forward = Forward();
+
+                    // Remove the velocity component along forward direction
+                    player.velocity += forward * (-player.velocity.dot(forward));
+                    if (keyboard.GetKey(olc::Key::W).bHeld) player.velocity += forward * moveSpeed;
+                    if (keyboard.GetKey(olc::Key::S).bHeld) player.velocity += forward * -moveSpeed;
+
+                    olc::vf4d surfaceUp = -GravityDirection(player.gravity);
+                    olc::vf4d right_dir = surfaceUp.cross(forward);
+
+                    // Remove only the velocity component along right_dir.
+                    player.velocity += right_dir * (-player.velocity.dot(right_dir));
+
+                    if (keyboard.GetKey(olc::Key::A).bHeld)
+                    {
+                        player.velocity += right_dir * -moveSpeed;
+                    }
+                    if (keyboard.GetKey(olc::Key::D).bHeld)
+                    {
+                        player.velocity += right_dir * moveSpeed;
+                    }
+                }
+                break;
+            } 
+        }
 
         /************** Game State Update ****************/
 
@@ -1076,21 +1184,19 @@ public:
         }
 
         // Update player
-        if (!levelComplete)
+        if (gameState == GameState::Playing)
         {
             BodyUpdate(player, dt);
+            CollectCoins();
         }
-        CollectCoins();
 
         // Check the Gate
-        if (hall.GateOpen() && player.pos.x >=
+        if (gameState == GameState::Playing && 
+                hall.GateOpen() && player.pos.x >=
                 hall.length - player.halfSize.x - tolerance) 
         {
-            if (!levelComplete)
-            {
-                completionComment = CompletionComment(levelTime <= hall.parTime);
-            }
-            levelComplete = true;
+            completionComment = CompletionComment(levelTime <= hall.parTime);
+            gameState = GameState::Complete;
         }
 
         // Out of bounds check
@@ -1137,7 +1243,7 @@ public:
         LashInfo lash = CheckWalls(ray);
 
         bool newWall = lash.wall != player.gravity;
-        if (!levelComplete && mouse.GetButton(0).bPressed && newWall && lash.hit)
+        if (gameState == GameState::Playing && mouse.GetButton(0).bPressed && newWall && lash.hit)
         {
             // Check that the player is in the hall
             if (hall.Contains(player.pos))
@@ -1201,25 +1307,51 @@ public:
         float x = ScreenSize().x - size.x - 2;
         draw.String({x,2}, timeStr.str(), olc::Colour::YELLOW);
 
-        if (levelComplete)
+        if (gameState == GameState::Intro)
         {
+            DrawPanel(hall.levelText);
+        }
 
+
+        if (gameState == GameState::Complete)
+        {
             std::ostringstream completeStr;
-            completeStr << std::fixed << std::setprecision(2)
-                << "Level Complete!" << "\n"
-                << "Par Time : " << hall.parTime << "\n"
-                << "Your Time: " << levelTime << "\n"
-                << completionComment;
-            draw.String({2,10}, completeStr.str(), olc::Colour::YELLOW);
+
+            std::ostringstream parStr;
+            parStr << std::fixed << std::setprecision(2)
+                << "Par Time : " << hall.parTime;
+
+            std::ostringstream timeStr;
+            timeStr << std::fixed << std::setprecision(2)
+                << "Your Time: " << levelTime;
+
+            DrawPanel({
+                "Level Complete!",
+                "",
+                parStr.str(),
+                timeStr.str(),
+                "",
+                completionComment
+            });
+        }
+        if (gameState == GameState::End)
+        {
+            DrawPanel({
+                "Congratulations!",
+                "",
+                "You completed the game!",
+                "",
+                "Press spacebar to play again"
+            });
         }
 
         if (showDebug)
         {
-            draw.String({ 2, 20 }, std::string("Gravity: ") + GravityName(player.gravity)
+            draw.String({ 2, 100 }, std::string("Gravity: ") + GravityName(player.gravity)
                     + "\nPosition: " + ToString(player.pos), olc::Colour::YELLOW);
             if (lash.hit)
             {
-                draw.String({2, 40}, "Hit Point: " + ToString(lash.hit_point) + "\n" +
+                draw.String({2, 120}, "Hit Point: " + ToString(lash.hit_point) + "\n" +
                         "Hit Floor: " + GravityName(lash.wall) + "\n"
                         ,olc::Colour::YELLOW);
             }
@@ -1229,7 +1361,6 @@ public:
         return true;
     }
 };
-
 
 int main()
 {

@@ -1,4 +1,18 @@
 name = First Steps
+
+text =
+Collect all the change to turn
+the end gate from red to green.
+Touch the green gate to complete
+the level.  Can you beet the par time?
+
+WASD:  to move.
+Q:     to turn 180
+Space: to jump
+R:     restart the level
+Esc:   quits game
+endtext
+
 par = 10
 
 # start slice lane
