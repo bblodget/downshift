@@ -1302,7 +1302,7 @@ public:
         // Draw Hallway
         draw.SetModelMatrix(rot);
         draw.Mesh(olc::Structure::List, hall.mesh.pos, hall.mesh.col);
-        olc::Pixel gateColor = hall.GateOpen() ? olc::Colour::GREEN :
+        olc::Pixel gateColor = hall.GateOpen() ? olc::Colour::DARK_GREEN :
             olc::Colour::RED ;
         draw.Mesh(olc::Structure::List, hall.gateMesh.pos, 
                 hall.gateMesh.col, gateColor);
