@@ -55,8 +55,13 @@ if(EMSCRIPTEN)
         -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2
         -sUSE_LIBPNG=1
         -sLLD_REPORT_UNDEFINED
+        --shell-file ${CMAKE_SOURCE_DIR}/web/shell.html
         --preload-file ${CMAKE_SOURCE_DIR}/assets@assets)
     target_compile_options(${GAME} PRIVATE -sUSE_LIBPNG=1)
+    set_property(TARGET ${GAME} APPEND PROPERTY LINK_DEPENDS ${CMAKE_SOURCE_DIR}/web/shell.html)
+    file(GLOB_RECURSE ASSET_FILES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/assets/*)
+    set_property(TARGET ${GAME} APPEND PROPERTY LINK_DEPENDS ${ASSET_FILES})
+
 elseif(UNIX AND NOT APPLE)
     if(USE_WAYLAND)
         find_package(PkgConfig REQUIRED)
