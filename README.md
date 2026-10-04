@@ -26,6 +26,13 @@ start, and the clock keeps running.
 | Esc | quit (desktop only) |
 | \` | toggle the debug HUD |
 
+## Play Online
+
+Downshift has been submitted to the OLC CodeJam 2026.
+You can play in your browser at
+
+[https://bblodget.itch.io/downshift](https://bblodget.itch.io/downshift)
+
 ## Build and run
 
 Needs a C++20 compiler (g++ 13 or newer) and a checkout of
