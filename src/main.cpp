@@ -116,6 +116,7 @@ const std::string levelFiles[] =
     "./assets/levels/level02.txt",
     "./assets/levels/level03.txt",
     "./assets/levels/level04.txt",
+    "./assets/levels/level05.txt",
 };
 
 olc::vf4d GravityDirection(Gravity gravity)
