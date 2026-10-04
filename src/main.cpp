@@ -1,5 +1,5 @@
 /*
-    Downshift: Escape a 3D maze by changing gravity.
+    Downshift: 3D speed-run through hallways in space.
 
     OLC CodeJam 2026 entry.
 
@@ -1125,7 +1125,9 @@ public:
         /************** Check Controls ****************/
 
         // Escape quits the game
+#ifndef __EMSCRIPTEN__
         if (keyboard.GetKey(olc::Key::ESCAPE).bPressed) return false;
+#endif
 
         // Toggle debug HUD
         if (keyboard.GetKey(olc::Key::OEM_3).bPressed)
