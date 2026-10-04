@@ -51,12 +51,13 @@ if(EMSCRIPTEN)
         -sASYNCIFY                      # PGE3's main loop needs it on the web
         -sALLOW_MEMORY_GROWTH=1
         -sSTACK_SIZE=1048576
-        -sEXPORTED_RUNTIME_METHODS=HEAPF32
+        -sEXPORTED_RUNTIME_METHODS=HEAPF32,requestFullscreen
         -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2
         -sUSE_LIBPNG=1
         -sLLD_REPORT_UNDEFINED
         --shell-file ${CMAKE_SOURCE_DIR}/web/shell.html
-        --preload-file ${CMAKE_SOURCE_DIR}/assets@assets)
+        --preload-file ${CMAKE_SOURCE_DIR}/assets@assets
+        )
     target_compile_options(${GAME} PRIVATE -sUSE_LIBPNG=1)
     set_property(TARGET ${GAME} APPEND PROPERTY LINK_DEPENDS ${CMAKE_SOURCE_DIR}/web/shell.html)
     file(GLOB_RECURSE ASSET_FILES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/assets/*)

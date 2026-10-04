@@ -2,7 +2,7 @@ name = Ending Flip
 par = 20
 
 text =
-Find your rythm a couple 
+Find your rhythm a couple 
 of times then watch for the 
 flip at the end.
 
