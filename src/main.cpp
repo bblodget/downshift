@@ -42,6 +42,7 @@ constexpr float pickupRadius = 0.85f;
 constexpr float jumpSpeed = 12.0f; 
 constexpr float lift = coinRadius + 0.60f;
 constexpr float coyoteTime = 0.12f;
+constexpr float drawShrink = 0.98f;
 
 // Remove leading and trailing whitespace
 std::string Trim(const std::string& text)
@@ -1085,7 +1086,7 @@ public:
     bool OnUserCreate() override
     {
         // Setup Camera
-        cam.SetPerspective(75.0f * PI / 180.0f, float(ScreenSize().x) / ScreenSize().y, 0.1f, 100.0f);
+        cam.SetPerspective(75.0f * PI / 180.0f, float(ScreenSize().x) / ScreenSize().y, 0.3f, 100.0f);
         cam.SetDistance(3.0f);          // distance in units
         cam.SetPitch(PI/18);            // Look down at 10 degrees.
         cam.SetYawEaseRate(5.0f);
@@ -1337,7 +1338,7 @@ public:
         // Draw Player Cube
         olc::mf4d tr, sc;
         tr.translate(player.pos);
-        olc::vf4d s = player.halfSize * 2;
+        olc::vf4d s = player.halfSize * 2.0f * drawShrink;
         sc.scale(s.x, s.y, s.z);
         // Matrices apply right to left
         // So scale, then translate, then rotate
