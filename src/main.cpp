@@ -12,6 +12,8 @@ License: OLC-3, see LICENSE.md for details.
 // the Pixel Game Engine as part of this translation unit
 #define OLC_PGE3_APPLICATION
 #include "olcPixelGameEngine3.h"
+#include "miniaudio.h"
+#include "olcPGEX3_Miniaudio.h"
 #include "camera3D.h"
 #include <numbers>
 #include <iomanip>
@@ -615,6 +617,12 @@ public:
     Downshift()
     {
         sAppName = "Downshift";
+        if (!InstallSystemExtension(&audio))
+        {
+            std::cerr 
+                << "Warning: Audio Extension failed to load, no sound" 
+                << std::endl;
+        }
     }
 
     Hall hall;
@@ -634,6 +642,11 @@ public:
     std::string completionComment = "How did this get here?";
     int levelIndex = 0;
     GameState gameState = GameState::Intro;
+    olc::ext::Miniaudio::AudioEngine audio;
+    olc::ext::Miniaudio::Sound sndCoin, sndFall, sndGate;
+    olc::ext::Miniaudio::Sound  sndJump, sndLand, sndLash;
+    olc::ext::Miniaudio::Sound  sndParBeat, sndParMissed;
+    bool gateWasOpen = false;
 
     void DrawPanel(const std::vector<std::string>& lines,
             olc::Pixel color = olc::Colour::YELLOW)
@@ -775,6 +788,7 @@ public:
             if ((player.pos - coin.pos).mag() < pickupRadius)
             {
                 coin.collected = true;
+                sndCoin.Play();
             }
         }
     }
@@ -1085,6 +1099,24 @@ public:
     // Called once at the start, so create things here
     bool OnUserCreate() override
     {
+        // Load Sounds
+        if (!audio.CreateSoundFromFile(sndCoin,"assets/sfx/coin.wav"))
+            std::cerr << "Failed to load coin.wav" << std::endl;
+        if (!audio.CreateSoundFromFile(sndFall,"assets/sfx/fall.wav"))
+            std::cerr << "Failed to load fall.wav" << std::endl;
+        if (!audio.CreateSoundFromFile(sndGate,"assets/sfx/gate.wav"))
+            std::cerr << "Failed to load gate.wav" << std::endl;
+        if (!audio.CreateSoundFromFile(sndJump,"assets/sfx/jump.wav"))
+            std::cerr << "Failed to load jump.wav" << std::endl;
+        if (!audio.CreateSoundFromFile(sndLand,"assets/sfx/land.wav"))
+            std::cerr << "Failed to load land.wav" << std::endl;
+        if (!audio.CreateSoundFromFile(sndLash,"assets/sfx/lash.wav"))
+            std::cerr << "Failed to load lash.wav" << std::endl;
+        if (!audio.CreateSoundFromFile(sndParBeat,"assets/sfx/parBeat.wav"))
+            std::cerr << "Failed to load parBeat.wav" << std::endl;
+        if (!audio.CreateSoundFromFile(sndParMissed,"assets/sfx/parMissed.wav"))
+            std::cerr << "Failed to load parMissed.wav" << std::endl;
+
         // Setup Camera
         cam.SetPerspective(75.0f * PI / 180.0f, float(ScreenSize().x) / ScreenSize().y, 0.3f, 100.0f);
         cam.SetDistance(3.0f);          // distance in units
@@ -1202,6 +1234,7 @@ public:
                             std::cout << "CoyoteTime! " << player.coyoteTimer << std::endl;
                         }
                         player.Jump();
+                        sndJump.Play();
                     }
                 }
 
@@ -1251,7 +1284,13 @@ public:
         // Update player
         if (gameState == GameState::Playing)
         {
+            Motion oldMotion = player.motion;
             BodyUpdate(player, dt);
+            if (player.motion != oldMotion 
+                    && player.motion == Motion::Grounded)
+            {
+                sndLand.Play();
+            }
             CollectCoins();
             if (player.motion == Motion::Falling)
             {
@@ -1260,17 +1299,37 @@ public:
         }
 
         // Check the Gate
+        if (hall.GateOpen() && !gateWasOpen)
+        {
+            sndGate.Play();
+        }
+        gateWasOpen = hall.GateOpen();
+
         if (gameState == GameState::Playing && 
                 hall.GateOpen() && player.pos.x >=
                 hall.length - player.halfSize.x - tolerance) 
         {
-            completionComment = CompletionComment(levelTime <= hall.parTime);
+            bool beatPar = levelTime <= hall.parTime;
+            completionComment = CompletionComment(beatPar);
             gameState = GameState::Complete;
+            if (beatPar)
+            {
+                sndParBeat.Play();
+            }
+            else
+            {
+                sndParMissed.Play();
+            }
         }
 
         // Out of bounds check
         if (!hall.Contains(player.pos)) 
         {
+            if (outTime == 0.0f)
+            {
+                // We just started falling, play sound
+                sndFall.Play();
+            }
             outTime += dt;
             if (outTime > fallTime)
             {
@@ -1318,6 +1377,7 @@ public:
             if (hall.Contains(player.pos))
             {
                 player.Lash(lash.wall, lash.hit_point);
+                sndLash.Play();
             }
         }
 

@@ -33,8 +33,9 @@ if(NOT EXISTS "${PGE3_DIR}/olcPixelGameEngine3.h")
 endif()
 
 # ---- Target ----------------------------------------------------------------
-add_executable(${GAME} src/main.cpp)
-target_include_directories(${GAME} SYSTEM PRIVATE "${PGE3_DIR}" "${PGE3_DIR}/utilities")
+add_executable(${GAME} src/main.cpp src/audio.cpp)
+target_include_directories(${GAME} SYSTEM PRIVATE "${PGE3_DIR}" 
+    "${PGE3_DIR}/utilities" "${PGE3_DIR}/extensions/miniaudio" "third_party")
 target_include_directories(${GAME} PRIVATE src)
 target_compile_options(${GAME} PRIVATE -Wall -Wextra -Wno-unused-parameter)
 
@@ -88,10 +89,10 @@ elseif(UNIX AND NOT APPLE)
         target_compile_definitions(${GAME} PRIVATE OLC_HOST=3)
         target_include_directories(${GAME} PRIVATE ${WL_INCLUDE_DIRS})
         target_link_libraries(${GAME} PRIVATE wl_xdg-shell wl_pointer-warp
-            ${WL_LIBRARIES} PkgConfig::LIBDECOR OpenGL::GL PNG::PNG Threads::Threads)
+            ${WL_LIBRARIES} PkgConfig::LIBDECOR OpenGL::GL PNG::PNG Threads::Threads dl)
     else()
         # X11 (also runs under XWayland). OLC_HOST left unset: header defaults to X11 on Linux.
-        target_link_libraries(${GAME} PRIVATE png GL X11 Xi Threads::Threads)
+        target_link_libraries(${GAME} PRIVATE png GL X11 Xi Threads::Threads dl)
     endif()
 endif()
 
