@@ -35,7 +35,7 @@ endif()
 # ---- Target ----------------------------------------------------------------
 add_executable(${GAME} src/main.cpp src/audio.cpp)
 target_include_directories(${GAME} SYSTEM PRIVATE "${PGE3_DIR}" 
-    "${PGE3_DIR}/utilities" "${PGE3_DIR}/extensions/miniaudio" "third_party")
+    "${PGE3_DIR}/utilities" "third_party")
 target_include_directories(${GAME} PRIVATE src)
 target_compile_options(${GAME} PRIVATE -Wall -Wextra -Wno-unused-parameter)
 

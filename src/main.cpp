@@ -12,7 +12,6 @@ License: OLC-3, see LICENSE.md for details.
 // the Pixel Game Engine as part of this translation unit
 #define OLC_PGE3_APPLICATION
 #include "olcPixelGameEngine3.h"
-#include "miniaudio.h"
 #include "olcPGEX3_Miniaudio.h"
 #include "camera3D.h"
 #include <numbers>
@@ -664,9 +663,7 @@ public:
         if (musicState != MusicState::Disabled)
         {
             musicState = MusicState::Intro;
-            sndThemeIntro.Seek(0.0f);
-            sndThemeIntro.SetVolume(musicVolume);
-            sndThemeIntro.Play(false);
+            audio.Play(sndThemeIntro,false,musicVolume);
         }
     }
 
@@ -674,11 +671,8 @@ public:
     {
         if (musicState != MusicState::Disabled)
         {
-            sndThemeIntro.Pause();
             musicState = MusicState::Loop;
-            sndTheme.Seek(0.0f);
-            sndTheme.SetVolume(musicVolume);
-            sndTheme.Play(true);
+            audio.Play(sndTheme,true,musicVolume);
         }
     }
 
@@ -822,7 +816,7 @@ public:
             if ((player.pos - coin.pos).mag() < pickupRadius)
             {
                 coin.collected = true;
-                sndCoin.Play();
+                audio.Play(sndCoin);
             }
         }
     }
@@ -1214,8 +1208,8 @@ public:
         {
             if (musicState != MusicState::Disabled)
             {
-                sndThemeIntro.Pause();
-                sndTheme.Pause();
+                audio.Pause(sndThemeIntro);
+                audio.Pause(sndTheme);
                 musicState = MusicState::Disabled;
             }
             else
@@ -1295,7 +1289,7 @@ public:
                             std::cout << "CoyoteTime! " << player.coyoteTimer << std::endl;
                         }
                         player.Jump();
-                        sndJump.Play();
+                        audio.Play(sndJump);
                     }
                 }
 
@@ -1350,7 +1344,7 @@ public:
             if (player.motion != oldMotion 
                     && player.motion == Motion::Grounded)
             {
-                sndLand.Play();
+                audio.Play(sndLand);
             }
             CollectCoins();
             if (player.motion == Motion::Falling)
@@ -1362,7 +1356,7 @@ public:
         // Check the Music
         if (musicState == MusicState::Intro)
         {
-            if (!sndThemeIntro.IsPlaying())
+            if (!audio.IsPlaying(sndThemeIntro))
             {
                 StartLoopMusic();
             }
@@ -1371,7 +1365,7 @@ public:
         // Check the Gate
         if (hall.GateOpen() && !gateWasOpen)
         {
-            sndGate.Play();
+            audio.Play(sndGate);
         }
         gateWasOpen = hall.GateOpen();
 
@@ -1381,8 +1375,8 @@ public:
         {
             bool beatPar = levelTime <= hall.parTime;
             completionComment = CompletionComment(beatPar);
-            sndThemeIntro.Pause();
-            sndTheme.Pause();
+            audio.Pause(sndThemeIntro);
+            audio.Pause(sndTheme);
             if (musicState != MusicState::Disabled)
             {
                 musicState = MusicState::Paused;
@@ -1390,11 +1384,11 @@ public:
             gameState = GameState::Complete;
             if (beatPar)
             {
-                sndParBeat.Play();
+                audio.Play(sndParBeat);
             }
             else
             {
-                sndParMissed.Play();
+                audio.Play(sndParMissed);
             }
         }
 
@@ -1404,7 +1398,7 @@ public:
             if (outTime == 0.0f)
             {
                 // We just started falling, play sound
-                sndFall.Play();
+                audio.Play(sndFall);
             }
             outTime += dt;
             if (outTime > fallTime)
@@ -1453,7 +1447,7 @@ public:
             if (hall.Contains(player.pos))
             {
                 player.Lash(lash.wall, lash.hit_point);
-                sndLash.Play();
+                audio.Play(sndLash);
             }
         }
 
