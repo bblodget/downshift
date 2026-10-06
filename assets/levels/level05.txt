@@ -8,6 +8,7 @@ WASD:  to move.
 Q:     to turn 180
 Space: to jump
 R:     restart the level
+M:     toggles music
 endtext
 
 par = 120

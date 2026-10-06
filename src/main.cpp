@@ -45,6 +45,7 @@ constexpr float jumpSpeed = 12.0f;
 constexpr float lift = coinRadius + 0.60f;
 constexpr float coyoteTime = 0.12f;
 constexpr float drawShrink = 0.98f;
+constexpr float musicVolume = 0.5f;
 
 // Remove leading and trailing whitespace
 std::string Trim(const std::string& text)
@@ -65,6 +66,14 @@ std::string ToString(const olc::vf4d& v)
         << v.z << ", " << v.w << ")";
     return out.str();
 }
+
+enum class MusicState
+{
+    Paused = 0,
+    Intro  = 1,
+    Loop   = 2,
+    Disabled = 3
+};
 
 enum class GameState
 {
@@ -646,7 +655,32 @@ public:
     olc::ext::Miniaudio::Sound sndCoin, sndFall, sndGate;
     olc::ext::Miniaudio::Sound  sndJump, sndLand, sndLash;
     olc::ext::Miniaudio::Sound  sndParBeat, sndParMissed;
+    olc::ext::Miniaudio::Sound sndTheme, sndThemeIntro;
     bool gateWasOpen = false;
+    MusicState musicState = MusicState::Paused;
+
+    void StartIntroMusic()
+    {
+        if (musicState != MusicState::Disabled)
+        {
+            musicState = MusicState::Intro;
+            sndThemeIntro.Seek(0.0f);
+            sndThemeIntro.SetVolume(musicVolume);
+            sndThemeIntro.Play(false);
+        }
+    }
+
+    void StartLoopMusic()
+    {
+        if (musicState != MusicState::Disabled)
+        {
+            sndThemeIntro.Pause();
+            musicState = MusicState::Loop;
+            sndTheme.Seek(0.0f);
+            sndTheme.SetVolume(musicVolume);
+            sndTheme.Play(true);
+        }
+    }
 
     void DrawPanel(const std::vector<std::string>& lines,
             olc::Pixel color = olc::Colour::YELLOW)
@@ -1116,6 +1150,10 @@ public:
             std::cerr << "Failed to load parBeat.wav" << std::endl;
         if (!audio.CreateSoundFromFile(sndParMissed,"assets/sfx/parMissed.wav"))
             std::cerr << "Failed to load parMissed.wav" << std::endl;
+        if (!audio.CreateSoundFromFile(sndTheme,"assets/music/theme.mp3"))
+            std::cerr << "Failed to load theme.mp3" << std::endl;
+        if (!audio.CreateSoundFromFile(sndThemeIntro,"assets/music/theme_intro.mp3"))
+            std::cerr << "Failed to load theme_intro.mp3" << std::endl;
 
         // Setup Camera
         cam.SetPerspective(75.0f * PI / 180.0f, float(ScreenSize().x) / ScreenSize().y, 0.3f, 100.0f);
@@ -1171,6 +1209,25 @@ public:
             LoadLevel(levelIndex);
         }
 
+        // Press M to toggle music
+        if (keyboard.GetKey(olc::Key::M).bPressed)
+        {
+            if (musicState != MusicState::Disabled)
+            {
+                sndThemeIntro.Pause();
+                sndTheme.Pause();
+                musicState = MusicState::Disabled;
+            }
+            else
+            {
+                musicState = MusicState::Paused;
+                if (gameState == GameState::Playing)
+                {
+                    StartIntroMusic();
+                }
+            }
+        }
+
         switch (gameState)
         {
             case GameState::Intro:
@@ -1178,6 +1235,10 @@ public:
                 if (keyboard.GetKey(olc::Key::SPACE).bPressed)
                 {
                     gameState = GameState::Playing;
+                    if (musicState == MusicState::Paused)
+                    {
+                        StartIntroMusic();
+                    }
                 }
                 if (keyboard.GetKey(olc::Key::N).bPressed)
                 {
@@ -1298,6 +1359,15 @@ public:
             }
         }
 
+        // Check the Music
+        if (musicState == MusicState::Intro)
+        {
+            if (!sndThemeIntro.IsPlaying())
+            {
+                StartLoopMusic();
+            }
+        }
+
         // Check the Gate
         if (hall.GateOpen() && !gateWasOpen)
         {
@@ -1311,6 +1381,12 @@ public:
         {
             bool beatPar = levelTime <= hall.parTime;
             completionComment = CompletionComment(beatPar);
+            sndThemeIntro.Pause();
+            sndTheme.Pause();
+            if (musicState != MusicState::Disabled)
+            {
+                musicState = MusicState::Paused;
+            }
             gameState = GameState::Complete;
             if (beatPar)
             {

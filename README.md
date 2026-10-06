@@ -23,6 +23,7 @@ start, and the clock keeps running.
 | Q | turn around |
 | R | restart the level (also reloads the level file) |
 | N | skip to the next level (on the intro card) |
+| M | toggles the music on and off |
 | Esc | quit (desktop only) |
 | \` | toggle the debug HUD |
 
@@ -92,6 +93,14 @@ This game uses the OLC-3 License. See [LICENSE.md](LICENSE.md).
 
 Built with [olcPixelGameEngine3](https://github.com/OneLoneCoder/olcPixelGameEngine3),
 Copyright 2018-2026 OneLoneCoder.com, used under the OLC-3 License.
+
+Audio via olcPGEX3_Miniaudio by Moros1138 (OLC-3)
+
+miniaudio by David Reid
+
+8-Bit Space Adventure Theme by emanresU, CC0, OpenGameArt
+
+Sound effects made with jsfxr
 
 AI disclosure: the gameplay code (`src/main.cpp`) and levels were written by
 me. Claude (Anthropic) was used as a guide and code reviewer. AI-written
