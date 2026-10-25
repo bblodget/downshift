@@ -45,6 +45,8 @@ constexpr float lift = coinRadius + 0.60f;
 constexpr float coyoteTime = 0.12f;
 constexpr float drawShrink = 0.98f;
 constexpr float musicVolume = 0.5f;
+constexpr int numStars = 1000;
+constexpr float starRadius = 50.0f;
 
 // Remove leading and trailing whitespace
 std::string Trim(const std::string& text)
@@ -635,6 +637,7 @@ public:
 
     Hall hall;
     Mesh cube;
+    Mesh starMesh;
     Mesh crystal;
     Mesh coinMesh;
     olc::utils::Camera3D    cam;
@@ -920,6 +923,80 @@ public:
         Triangle(crystal, h2, r4, r1, color * dark);
     }
 
+    void BuildStarMesh()
+    {
+        // Fixed seed
+        std::mt19937 rng(12345);
+        std::uniform_real_distribution<float> randDist(-1.0f, 1.0f);
+        std::uniform_real_distribution<float> randNum(0.0f, 1.0f);
+
+        starMesh.pos.clear();
+        starMesh.col.clear();
+
+        // Create the random stars
+        for (int i=0; i<numStars; i++)
+        {
+            float x = randDist(rng);
+            float y = randDist(rng);
+            float z = randDist(rng);
+            olc::vf4d dir = {x, y, z, 0.0f};
+            float dirMag = dir.mag2();
+
+            while (dirMag > 1 || dirMag < 0.1)
+            {
+                x = randDist(rng);
+                y = randDist(rng);
+                z = randDist(rng);
+                dir = {x, y, z, 0.0f};
+                dirMag = dir.mag2();
+            }
+            dir = dir.norm();
+            olc::vf4d starPos = dir * starRadius;
+
+            float s = randNum(rng);
+            s = std::lerp(0.1f, 0.3f, s * s);
+
+            float b = randNum(rng);
+            b = std::lerp(0.4f, 1.0f, b * b);
+
+            float t = randNum(rng);
+
+            olc::Pixel tint = olc::Colour::WHITE;
+            if (t <= 0.1)
+            {
+                // Blueish
+                tint = olc::Pixel(180, 200, 255, 255);
+            } else if (t <= 0.2)
+            {
+                // Yellowish
+                tint = olc::Pixel(255, 240, 180, 255);
+            }
+            tint = tint * b; // scale by brightness
+            
+            olc::vf4d up = {0.0f, 1.0f, 0.0f, 0.0f};
+            if (std::abs(dir.y) > 0.99f)
+            {
+                // for rare case when star is straight up.
+                // switch the up direction
+                up.x = 1.0f;
+                up.y = 0.0f;
+            }
+            olc::vf4d right = dir.cross(up);
+            right = right.norm();
+            olc::vf4d up2 = dir.cross(right);
+            // Scale by s
+            right = right * s;
+            up2 = up2 * s;
+
+            olc::vf4d a = starPos - right + up2;
+            olc::vf4d b2 = starPos - right - up2;
+            olc::vf4d c = starPos + right - up2;
+            olc::vf4d d = starPos + right + up2;
+
+            Face(starMesh, a, b2, c, d, tint);
+        }
+    }
+
     void BuildCubeMesh()
     {
         // Empty the cube mesh before building
@@ -1170,6 +1247,9 @@ public:
         // Build the player
         BuildCubeMesh();
         player.mesh = &cube;
+
+        // Build the stars
+        BuildStarMesh();
 
         return true;
     }
@@ -1454,9 +1534,17 @@ public:
         /************** Drawing ****************/
 
         // Clear screen to dark blue
-        draw.Clear(olc::Colour::VERY_DARK_BLUE);
+        // draw.Clear(olc::Colour::VERY_DARK_BLUE);
+        draw.Clear(olc::Colour::BLACK);
 
         draw.SetCullMode(olc::CullMode::ClockWise);
+
+        // Draw Stars
+        draw.EnableDepth(false);
+        olc::mf4d starTr;
+        starTr.translate(cam.Eye());
+        draw.SetModelMatrix(starTr * rot);
+        draw.Mesh(olc::Structure::List, starMesh.pos, starMesh.col);
         draw.EnableDepth(true);
 
         // Draw Hallway
