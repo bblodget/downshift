@@ -24,6 +24,7 @@ start, and the clock keeps running.
 | R | restart the level (also reloads the level file) |
 | N | skip to the next level (on the intro card) |
 | M | toggles the music on and off |
+| B | cycles the background style |
 | Esc | quit (desktop only) |
 | \` | toggle the debug HUD |
 

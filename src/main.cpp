@@ -68,6 +68,22 @@ std::string ToString(const olc::vf4d& v)
     return out.str();
 }
 
+enum class BackgroundType
+{
+    Stars   = 0,
+    Skybox  = 1,
+    Shader  = 2,
+    Flat    = 3,  // no stars
+    Count
+};
+
+BackgroundType BackgroundNext(BackgroundType b)
+{
+    int bi = static_cast<int>(b);
+    bi = (bi + 1) % static_cast<int>(BackgroundType::Count);
+    return static_cast<BackgroundType>(bi);
+}
+
 enum class MusicState
 {
     Paused = 0,
@@ -660,6 +676,7 @@ public:
     olc::ext::Miniaudio::Sound sndTheme, sndThemeIntro;
     bool gateWasOpen = false;
     MusicState musicState = MusicState::Paused;
+    BackgroundType backgroundType = BackgroundType::Stars;
 
     void StartIntroMusic()
     {
@@ -1248,8 +1265,14 @@ public:
         BuildCubeMesh();
         player.mesh = &cube;
 
-        // Build the stars
+        // Build every background so B can switch at run time
+        
+        // For BackgroundType::Stars
         BuildStarMesh();
+
+        // For BackgroundType::Skybox
+
+        // For BackgroundType::Shader
 
         return true;
     }
@@ -1281,6 +1304,12 @@ public:
         if (keyboard.GetKey(olc::Key::R).bPressed)
         {
             LoadLevel(levelIndex);
+        }
+
+        // Press B to change Background type
+        if (keyboard.GetKey(olc::Key::B).bPressed)
+        {
+            backgroundType = BackgroundNext(backgroundType);
         }
 
         // Press M to toggle music
@@ -1539,12 +1568,25 @@ public:
 
         draw.SetCullMode(olc::CullMode::ClockWise);
 
-        // Draw Stars
+        // Draw Background
         draw.EnableDepth(false);
         olc::mf4d starTr;
-        starTr.translate(cam.Eye());
-        draw.SetModelMatrix(starTr * rot);
-        draw.Mesh(olc::Structure::List, starMesh.pos, starMesh.col);
+        switch (backgroundType)
+        {
+            case BackgroundType::Stars:
+                starTr.translate(cam.Eye());
+                draw.SetModelMatrix(starTr * rot);
+                draw.Mesh(olc::Structure::List, starMesh.pos, starMesh.col);
+                break;
+            case BackgroundType::Skybox:
+                break;
+            case BackgroundType::Shader:
+                break;
+            case BackgroundType::Flat:
+                break;
+            default:
+                break;
+        }
         draw.EnableDepth(true);
 
         // Draw Hallway
